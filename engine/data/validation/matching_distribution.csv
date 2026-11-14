@@ -1,0 +1,10 @@
+country_name,year,sensor_a,sensor_b,matching_pairs
+Algeria,2018,MODIS,VIIRS,408
+Algeria,2019,MODIS,VIIRS,2430
+Algeria,2020,MODIS,VIIRS,3075
+Egypt,2018,MODIS,VIIRS,129
+Egypt,2019,MODIS,VIIRS,89
+Egypt,2020,MODIS,VIIRS,162
+South_Africa,2018,MODIS,VIIRS,40808
+South_Africa,2019,MODIS,VIIRS,33682
+South_Africa,2020,MODIS,VIIRS,31196

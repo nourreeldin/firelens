@@ -1,0 +1,14 @@
+validation_check,invalid_count,status
+Missing detection A,0,PASS
+Missing detection B,0,PASS
+Self matching,0,PASS
+Duplicate pairs,0,PASS
+Invalid sensor combination,0,PASS
+Sensor metadata mismatch,0,PASS
+Country mismatch,0,PASS
+Country code mismatch,0,PASS
+Year mismatch,0,PASS
+Invalid actual distance,0,PASS
+Invalid actual time difference,0,PASS
+Stored distance discrepancies,0,WARNING
+Stored time discrepancies,0,WARNING

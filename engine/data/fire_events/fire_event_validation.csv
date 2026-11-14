@@ -1,0 +1,7 @@
+validation_check,count,status
+Duplicate member IDs,0,PASS
+Missing event IDs,0,PASS
+Single-sensor events,0,PASS
+Events exceeding review duration,0,PASS
+Events exceeding review spatial extent,9177,REVIEW
+Events requiring review,9177,REVIEW

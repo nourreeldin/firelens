@@ -1,0 +1,10 @@
+country_name,year,modis_observations,viirs_observations,matching_pairs
+Algeria,2018,1309,15477,408
+Algeria,2019,3836,22395,2430
+Algeria,2020,4751,21574,3075
+Egypt,2018,520,8692,129
+Egypt,2019,657,9631,89
+Egypt,2020,685,11785,162
+South_Africa,2018,39193,148519,40808
+South_Africa,2019,37353,148529,33682
+South_Africa,2020,35381,138281,31196

@@ -1,0 +1,18 @@
+validation_check,invalid_count,status
+Invalid coordinates,0,PASS
+Invalid timestamps,0,PASS
+Missing detection IDs,0,PASS
+Duplicate detection IDs,0,PASS
+Invalid countries,0,PASS
+Invalid country codes,0,PASS
+Invalid years,0,PASS
+Invalid sensors,0,PASS
+Sensor/instrument mismatch,0,PASS
+Missing values: latitude,0,PASS
+Missing values: longitude,0,PASS
+Missing values: acq_datetime_utc,0,PASS
+Missing values: detection_id,0,PASS
+Missing values: country_name,0,PASS
+Missing values: country_code,0,PASS
+Missing values: year,0,PASS
+Missing values: sensor,0,PASS
