@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f7f8fa" />
+    <title>FireLens · API documentation</title>
+    <link rel="stylesheet" href="/docs-assets/docs.css" />
+    <script defer src="/docs-assets/docs.js" data-openapi="__OPENAPI_URL__"></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="FireLens home">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12.2 3.2c.4 3.1-2.8 4.1-2.8 7.1 0 1.1.6 1.9 1.5 2.3-.2-1.9 1.1-2.7 2.1-3.7 2.3 2.3 3.8 4.5 3.8 7.1a4.8 4.8 0 0 1-9.6 0c0-2.1.9-3.7 2.4-5.4-.1 2.9 1.2 3.5 1.2 3.5-.1-4.3 3.6-5.6 1.4-10.9Z" /></svg>
+        </span>
+        <span>FireLens</span>
+      </a>
+      <div class="top-context">
+        <div><span class="eyebrow">API VERSION</span><strong id="api-version">Version 1</strong></div>
+        <div><span class="eyebrow">ACCESS</span><strong>Read-only</strong></div>
+      </div>
+      <a class="openapi-link" href="__OPENAPI_URL__" target="_blank" rel="noreferrer">OpenAPI schema <span aria-hidden="true">↗</span></a>
+    </header>
+
+    <div class="mobile-context">
+      <span>API documentation</span>
+      <span class="status-pill">READ-ONLY</span>
+    </div>
+
+    <main class="page-shell">
+      <section class="page-intro">
+        <div class="eyebrow">DEVELOPER RESOURCES</div>
+        <h1>API documentation</h1>
+        <p>A read-only interface for exploring historical fire activity and geospatial analysis.</p>
+        <div class="notice" role="note">
+          <span class="notice-icon" aria-hidden="true">i</span>
+          <span><strong>GET endpoints only.</strong> Requests retrieve data from this deployment. Response examples appear after you run a request.</span>
+        </div>
+      </section>
+
+      <div id="loading" class="loading-card">Loading API reference…</div>
+      <div id="load-error" class="error-card" hidden></div>
+
+      <div class="docs-layout" id="docs-layout" hidden>
+        <aside class="endpoint-card" aria-label="API endpoints">
+          <div class="endpoint-card-heading">
+            <span class="eyebrow">REST API</span>
+            <span class="version-tag" id="sidebar-version">V1</span>
+          </div>
+          <button class="overview-link" id="overview-button" type="button">
+            <span class="overview-icon" aria-hidden="true">▦</span> Overview
+          </button>
+          <div class="endpoint-list" id="endpoint-list"></div>
+          <p class="sidebar-note" id="endpoint-count"></p>
+        </aside>
+
+        <section class="main-column" aria-live="polite">
+          <article class="panel overview-panel" id="overview-panel">
+            <div class="panel-heading">
+              <div><h2>Overview</h2><p>Read-only interface for historical analysis</p></div>
+              <span class="status-pill">GET ONLY</span>
+            </div>
+            <p class="overview-copy" id="api-description"></p>
+            <div class="overview-foot"><span class="eyebrow">BASE PATH</span><code id="base-path">/api/v1</code></div>
+          </article>
+
+          <article class="panel operation-panel" id="operation-panel">
+            <div class="empty-selection">
+              <span class="empty-symbol" aria-hidden="true">⌘</span>
+              <h2>Select an endpoint</h2>
+              <p>Choose an endpoint from the list to review its parameters and run a request.</p>
+            </div>
+          </article>
+        </section>
+
+        <aside class="examples-column" aria-label="Request and response">
+          <section class="panel example-panel">
+            <div class="panel-heading">
+              <div><h2>Example request</h2><p>Built from the selected endpoint</p></div>
+              <button class="icon-button copy-button" type="button" data-copy="request-code" aria-label="Copy request">▢</button>
+            </div>
+            <div class="request-line"><span class="method-chip">GET</span><code id="request-path">Select an endpoint</code></div>
+            <div class="code-panel"><pre id="request-code">Select an endpoint to see its request.</pre></div>
+            <button class="run-button" id="run-request" type="button" disabled>Run request <span aria-hidden="true">→</span></button>
+            <p class="request-help" id="request-help">Choose an endpoint to configure the request.</p>
+          </section>
+
+          <section class="panel response-panel">
+            <div class="panel-heading">
+              <div><h2>Response</h2><p id="response-caption">No request sent</p></div>
+              <button class="icon-button copy-button" type="button" data-copy="response-code" aria-label="Copy response" disabled>▢</button>
+            </div>
+            <div class="response-status-row"><span class="status-code" id="response-status">—</span><span class="response-state" id="response-state">Awaiting request</span></div>
+            <div class="code-panel response-code-panel"><pre id="response-code">Run a request to see its response here.</pre></div>
+          </section>
+        </aside>
+      </div>
+      <footer class="page-footer">FireLens · NASA Space Apps Cairo 2026 <span>Historical analysis only · Satellite detections are observations</span></footer>
+    </main>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </body>
+</html>
