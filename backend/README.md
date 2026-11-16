@@ -1,9 +1,12 @@
+<p><img src="app/static/firelens-wordmark.svg" alt="FireLens - Earth observation" width="253" height="64" /></p>
+
 # FireLens Backend
 
-Read-only FastAPI service for exploring harmonized **MODIS** and **VIIRS**
-active-fire detections from NASA FIRMS. The API uses **parameterized raw SQL**
-through an asyncpg connection pool against Supabase PostgreSQL + PostGIS. There
-is no ORM and the API never creates or alters database objects.
+Read-only FastAPI service for exploring standardized raw **MODIS** and **VIIRS**
+detections and their separate harmonized activity estimates from NASA FIRMS.
+The API uses **parameterized raw SQL** through an asyncpg connection pool
+against Supabase PostgreSQL + PostGIS. There is no ORM and the API never creates
+or alters database objects.
 
 > Satellite detections are observations, not confirmed fire boundaries. Sensor
 > differences, overpass timing, clouds, and detection limits matter.
@@ -57,10 +60,32 @@ construction.
 
 ## Supabase and data
 
-The canonical harmonized dataset is `public.fire_hotspots`. Important fields
-include `latitude`, `longitude`, `geom`, `acq_date`, `acq_time`,
-`acq_datetime_utc`, `sensor`, `confidence`, `satellite`, `country_code`,
-`country_name`, `continent`, and `spatial_grid_id`.
+`public.fire_hotspots` stores standardized raw satellite observations served by
+the existing fire, calendar, analytics, and export endpoints. It retains
+sensor-specific values such as `sensor` and `confidence`; those records are not
+the corrected activity estimates produced by the harmonization method.
+
+The database migration at
+[`../supabase/migrations/20261114000000_firelens_activity_schema.sql`](../supabase/migrations/20261114000000_firelens_activity_schema.sql)
+adds `public.harmonized_activity` and `public.validation_reports`, and extends
+the existing `regions` table while preserving its integer IDs. The migration
+also adds missing hotspot metadata columns and indexes. It is not run by the
+FastAPI application. It has been applied to the database configured by this
+workspace's `DATABASE_URL`; other environments must apply it separately before
+using the new routes.
+
+- Important `fire_hotspots` fields include `latitude`, `longitude`, `geom`,
+  `acq_date`, `acq_time`, `acq_datetime_utc`, `sensor`, `confidence`,
+  `satellite`, `country_code`, `country_name`, `continent`, and
+  `spatial_grid_id`.
+- `harmonized_activity` stores region/grid/day/method activity, source counts,
+  corrected counts, correction factors, and uncertainty.
+- `validation_reports` stores method-version metrics and their validation
+  periods. Metrics remain nullable until calculated.
+- `/api/v1/regions` still derives country filters from `fire_hotspots`; it does
+  not query the `regions` table.
+- `/api/v1/regions/catalog` returns the persisted integer-ID rows used by
+  harmonized and validation records.
 
 - Geometry is `geometry(Point, 4326)` with a GiST index.
 - Bounding-box queries use `ST_Intersects(geom, ST_MakeEnvelope(..., 4326))`.
@@ -83,11 +108,24 @@ All required feature routes are under `/api/v1`.
 | `GET` | `/api/v1/fires` | Paginated, filtered detections |
 | `GET` | `/api/v1/fires/{id}` | One detection |
 | `GET` | `/api/v1/regions` | Countries derived from hotspot data |
-| `GET` | `/api/v1/calendar` | Zero-filled daily counts |
-| `GET` | `/api/v1/analytics/seasonal` | Monthly and hemisphere-aware seasonal totals |
-| `GET` | `/api/v1/analytics/comparison` | Selected period vs prior-year baselines |
-| `GET` | `/api/v1/analytics/anomalies` | Robust median/MAD monthly anomalies |
+| `GET` | `/api/v1/regions/catalog` | Persisted integer-ID region catalog |
+| `GET` | `/api/v1/calendar` | Zero-filled raw detection counts |
+| `GET` | `/api/v1/analytics/seasonal` | Raw monthly and hemisphere-aware seasonal totals |
+| `GET` | `/api/v1/analytics/comparison` | Raw detections vs prior-year baselines |
+| `GET` | `/api/v1/analytics/anomalies` | Raw detection median/MAD anomalies |
+| `GET` | `/api/v1/harmonization` | Paginated corrected activity records |
+| `GET` | `/api/v1/harmonization/calendar` | Daily corrected activity and sensor counts |
+| `GET` | `/api/v1/harmonization/analytics/seasonal` | Corrected monthly and season-code totals |
+| `GET` | `/api/v1/harmonization/analytics/comparison` | Corrected monthly totals vs prior years |
+| `GET` | `/api/v1/harmonization/analytics/anomalies` | Corrected monthly median/MAD anomalies |
+| `GET` | `/api/v1/validation` | Paginated validation reports |
 | `GET` | `/api/v1/exports/fires` | Streamed CSV export |
+| `GET` | `/api/v1/exports/harmonization` | Streamed corrected activity CSV |
+| `GET` | `/api/v1/exports/validation` | Streamed validation CSV |
+
+The complete request and response reference is in [`API.md`](API.md). The raw
+calendar and analytics endpoints keep their existing response contracts and
+continue to count rows in `fire_hotspots`.
 
 Unversioned `/health` and `/health/ready` aliases remain available for container
 platforms and are excluded from the OpenAPI schema. There are no POST, PUT,
@@ -95,7 +133,8 @@ PATCH, or DELETE endpoints.
 
 ### Shared filters
 
-`/api/v1/fires`, `/calendar`, all analytics routes, and `/exports/fires` accept:
+Raw detection routes `/api/v1/fires`, `/calendar`, all top-level analytics
+routes, and `/exports/fires` accept:
 
 | Parameter | Notes |
 | --- | --- |
@@ -116,7 +155,15 @@ record includes the country name, continent, hotspot count, PostGIS bounding
 box, centroid, and centroid-based hemisphere. `id` is the three-letter country
 code.
 
+`/api/v1/regions/catalog` separately returns `id`, `name`, `slug`,
+`country_code`, description, and optional bounds from `public.regions`. Use
+`region_pk` (an integer) with harmonization and validation endpoints. Keep
+`region_id` as the three-letter country-code parameter on raw-fire endpoints.
+
 ### Calendar
+
+`/api/v1/calendar` remains detection-based and returns `fire_count` from
+`public.fire_hotspots`.
 
 Daily counts are generated in PostgreSQL with `generate_series` and
 `LEFT JOIN`, so days without detections are returned with zero. If both dates
@@ -159,6 +206,9 @@ Comparison periods must fall within a single calendar year. If dates are
 omitted, the latest year in the filtered dataset is used.
 
 ### Anomaly detection
+
+`/api/v1/analytics/anomalies` remains detection-based and counts rows in
+`public.fire_hotspots`.
 
 `/api/v1/analytics/anomalies` computes monthly totals and compares each month
 with the distribution of the same calendar month in prior years.
@@ -205,6 +255,41 @@ in memory.
   injection.
 - If `API_KEY` is configured, requests must include `X-API-Key`.
 
+The harmonization and validation CSV exports also stream through asyncpg
+server-side cursors. They use the same formula-injection protection and API-key
+requirement.
+
+### Harmonized activity and validation
+
+`GET /api/v1/harmonization` returns the stored rows from
+`public.harmonized_activity` in a `{status, data, pagination}` envelope. It
+supports `start_date`, `end_date`, `region_pk`, `spatial_grid_id`,
+`method_version`, `limit`, and `offset`. `region_pk` is the integer
+`public.regions.id`; it does not change the raw endpoints' country-code
+`region_id` parameter.
+
+`GET /api/v1/harmonization/calendar` supports the same activity filters and
+returns one day per method version. It sums harmonized activity and MODIS/VIIRS
+counts across matching grid records. It returns a stored uncertainty only if
+the grouped day contains one grid record; multi-grid uncertainty is `null`
+until the data science team defines a scientifically appropriate aggregation.
+When dates are omitted it uses the latest 30 days in the filtered activity
+data, subject to `MAX_CALENDAR_DAYS`.
+
+Harmonized seasonal, comparison, and anomaly analytics live under
+`/api/v1/harmonization/analytics/`. They do not replace the raw analytics. The
+seasonal endpoint returns `DJF`, `MAM`, `JJA`, and `SON` codes without
+hemisphere-specific labels because `harmonized_activity` has no latitude
+column. Comparison and anomaly baselines stay separate by `method_version`;
+they require a single calendar-year observation period. Historical mean,
+median, and anomaly scores remain unavailable until the configured minimum
+number of prior years is present.
+
+`GET /api/v1/validation` returns paginated reports from
+`public.validation_reports`. It accepts `region_pk`, `method_version`,
+`start_date`, and `end_date`; dates select report periods that overlap the
+requested interval. Nullable metrics remain `null` until calculated.
+
 ### Examples
 
 ```bash
@@ -223,6 +308,16 @@ curl "http://127.0.0.1:8000/api/v1/analytics/comparison?start_date=2025-01-01&en
 curl "http://127.0.0.1:8000/api/v1/analytics/anomalies?start_date=2025-01-01&end_date=2025-12-31"
 
 curl -OJ "http://127.0.0.1:8000/api/v1/exports/fires?region_id=EGY"
+
+curl "http://127.0.0.1:8000/api/v1/harmonization?start_date=2025-07-01&end_date=2025-07-31&region_pk=1&method_version=v1&limit=50"
+
+curl "http://127.0.0.1:8000/api/v1/harmonization/calendar?start_date=2025-07-01&end_date=2025-07-31&region_pk=1&method_version=v1"
+
+curl "http://127.0.0.1:8000/api/v1/harmonization/analytics/comparison?start_date=2025-01-01&end_date=2025-12-31&region_pk=1&method_version=v1"
+
+curl "http://127.0.0.1:8000/api/v1/validation?region_pk=1&method_version=v1&limit=25"
+
+curl -OJ "http://127.0.0.1:8000/api/v1/exports/harmonization?region_pk=1&method_version=v1"
 ```
 
 Expected current-data behavior: the comparison and anomaly endpoints return
@@ -240,22 +335,18 @@ Expected current-data behavior: the comparison and anomaly endpoints return
 - CORS allows only `GET` and `OPTIONS`.
 - Swagger/OpenAPI documentation is available at `/docs`.
 
-## Pending database cleanup (NOT EXECUTED)
+## Database rollout and legacy tables
 
-The empty scaffold tables `public.fire_detections` and `public.regions` are no
-longer used by the API. Database-level checks found only the foreign key
-`fire_detections.region_id → regions.id`, no dependent views, and no other
-dependencies. Both tables contain zero rows.
+The migration in `../supabase/migrations/` has been applied to the database
+configured by this workspace's `DATABASE_URL`. It is not executed by the API at
+startup, so other environments must apply it before using the harmonization and
+validation endpoints. It preserves `fire_hotspots` rows and existing integer
+region IDs.
 
-The following statement is **proposed and has not been executed**. It requires
-explicit approval before running:
-
-```sql
-DROP TABLE IF EXISTS public.fire_detections, public.regions;
-```
-
-Dropping these tables also drops their owned sequences
-`fire_detections_id_seq` and `regions_id_seq`.
+Keep `public.fire_detections` until ingestion and processing jobs outside this
+API have also been checked for dependencies. The API does not read it, but that
+alone does not establish that no external job uses it. `public.regions` is
+retained because harmonized activity and validation records reference its IDs.
 
 ## Project structure
 
@@ -284,8 +375,9 @@ backend/
   load-tested.
 - The derivation of country regions relies on populated `country_code` values.
 - `public.fire_daily_counts` is not used and has no refresh trigger/schedule.
-- No indexes were added. Existing `acq_date`, `country_code + acq_date`,
-  `acq_datetime_utc`, GiST geometry, `spatial_grid_id`, and `year + month`
-  indexes cover current filters; add a composite sensor/date index only after
-  approval and query-plan review.
-- The legacy scaffold tables remain until cleanup is approved.
+- The API does not apply schema changes at startup. The migration adds indexes
+  for hotspot date, country/date, sensor/date, grid/date, and geometry queries;
+  review the target database's current indexes before applying it to avoid
+  redundant indexes.
+- The legacy `fire_detections` scaffold table remains until cleanup is
+  approved. The `regions` table is retained for harmonized data references.

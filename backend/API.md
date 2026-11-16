@@ -1,895 +1,333 @@
+<p><img src="app/static/firelens-wordmark.svg" alt="FireLens - Earth observation" width="253" height="64" /></p>
+
 # FireLens API Reference
 
-> **Version:** 1.0.0  
-> **Base URL:** `http://127.0.0.1:8000`  
-> **Versioned prefix:** `/api/v1`  
-> **Interactive docs:** `/docs` (custom Swagger) · `/redoc`  
-> **OpenAPI schema:** `/openapi.json`
+Base URL: `http://127.0.0.1:8000/api/v1`
 
-All endpoints are **read-only** (`GET` / `OPTIONS`). There are no `POST`, `PUT`, `PATCH`, or `DELETE` operations.
+Swagger/OpenAPI is served at `/docs`; ReDoc is served at `/redoc`. All routes
+are read-only `GET` endpoints. CSV exports require `X-API-Key` only when
+`API_KEY` is configured.
 
----
+## Data products
 
-## Table of Contents
+| Table | Product | Routes |
+| --- | --- | --- |
+| `public.fire_hotspots` | Standardized raw satellite observations | `/fires`, `/calendar`, top-level `/analytics/*`, `/exports/fires` |
+| `public.harmonized_activity` | Corrected activity by region/grid/day/method | `/harmonization*`, `/exports/harmonization` |
+| `public.validation_reports` | Candidate-pair QA reports | `/validation`, `/exports/validation` |
+| `public.regions` | Persisted integer-ID regions | `/regions/catalog` |
 
-1. [Global Conventions](#1-global-conventions)
-2. [Shared Filters](#2-shared-filters)
-3. [Error Responses](#3-error-responses)
-4. [Root](#4-root-get-)
-5. [Health](#5-health)
-   - [GET /api/v1/health](#get-apiv1health)
-   - [GET /health](#get-health-liveness-alias)
-   - [GET /health/ready](#get-healthready-readiness-alias)
-6. [Fires](#6-fires)
-   - [GET /api/v1/fires](#get-apiv1fires)
-   - [GET /api/v1/fires/{fire_id}](#get-apiv1firesfire_id)
-7. [Regions](#7-regions)
-   - [GET /api/v1/regions](#get-apiv1regions)
-8. [Calendar](#8-calendar)
-   - [GET /api/v1/calendar](#get-apiv1calendar)
-9. [Analytics](#9-analytics)
-   - [GET /api/v1/analytics/seasonal](#get-apiv1analyticsseasonal)
-   - [GET /api/v1/analytics/comparison](#get-apiv1analyticscomparison)
-   - [GET /api/v1/analytics/anomalies](#get-apiv1analyticsanomalies)
-10. [Exports](#10-exports)
-    - [GET /api/v1/exports/fires](#get-apiv1exportsfires)
-11. [Schema Reference](#11-schema-reference)
-12. [Confidence Normalization](#12-confidence-normalization)
-13. [Season Classification](#13-season-classification)
+The existing `/regions` route still derives country filters from `fire_hotspots`
+and returns three-letter country codes. Raw-fire `region_id=EGY` remains a string
+country-code filter. Harmonized and validation routes use `region_pk=1` for the
+integer `public.regions.id`; the two identifiers are intentionally separate.
 
----
+## Route index
 
-## 1. Global Conventions
+| Method | Path | Product |
+| --- | --- | --- |
+| GET | `/health` | Database health |
+| GET | `/fires` | Paginated raw detections |
+| GET | `/fires/{id}` | One raw detection |
+| GET | `/regions` | Countries represented in hotspot data |
+| GET | `/regions/catalog` | Persisted integer-ID regions |
+| GET | `/calendar` | Raw detection calendar |
+| GET | `/analytics/seasonal` | Raw detection seasonality |
+| GET | `/analytics/comparison` | Raw detection historical comparison |
+| GET | `/analytics/anomalies` | Raw detection anomaly scores |
+| GET | `/exports/fires` | Raw detection CSV |
+| GET | `/harmonization` | Corrected activity records |
+| GET | `/harmonization/calendar` | Corrected daily activity |
+| GET | `/harmonization/analytics/seasonal` | Corrected monthly and seasonal activity |
+| GET | `/harmonization/analytics/comparison` | Corrected activity vs prior years |
+| GET | `/harmonization/analytics/anomalies` | Corrected activity anomalies |
+| GET | `/validation` | Validation reports |
+| GET | `/exports/harmonization` | Corrected activity CSV |
+| GET | `/exports/validation` | Validation CSV |
 
-| Property | Value |
-|---|---|
-| Protocol | HTTP/1.1, HTTPS recommended in production |
-| Allowed methods | `GET`, `OPTIONS` |
-| Content-Type (responses) | `application/json` (CSV for export) |
-| Date format | `YYYY-MM-DD` (ISO 8601) |
-| Datetime format | ISO 8601 UTC, e.g. `2025-07-15T10:30:00Z` |
-| Coordinate system | WGS 84 (EPSG 4326) |
-| Pagination style | Offset (`limit` / `offset`) |
-| Null handling | Optional fields are omitted or `null`; never fabricated |
+## Raw detections
 
-### CORS
+`GET /fires` accepts inclusive `start_date` and `end_date`, country-code
+`region_id`, `sensor`, a complete four-coordinate bounding box, `limit` (1–1000,
+default 100), and `offset` (default 0). Its response is:
 
-Allowed origins (default):
-
-```
-http://localhost:3000
-http://127.0.0.1:3000
-```
-
-`Content-Disposition` is explicitly exposed so browsers can read the CSV filename.
-
-### Authentication
-
-The API is **open by default**. The only protected endpoint is `GET /api/v1/exports/fires`, and only when the `API_KEY` environment variable is set on the server.
-
-| Endpoint | Auth required |
-|---|---|
-| All `/api/v1/*` except exports | None |
-| `GET /api/v1/exports/fires` | `X-API-Key: <key>` header **if** `API_KEY` is configured |
-
-When the key is required and missing or wrong, the server returns `401 Unauthorized`.
-
----
-
-## 2. Shared Filters
-
-The following query parameters are accepted by `/fires`, `/calendar`, all `/analytics/*` routes, and `/exports/fires`.
-
-| Parameter | Type | Default | Constraints | Description |
-|---|---|---|---|---|
-| `start_date` | `date` | `null` | `YYYY-MM-DD` | Inclusive acquisition-date lower bound |
-| `end_date` | `date` | `null` | `YYYY-MM-DD` | Inclusive acquisition-date upper bound |
-| `region_id` | `string` | `null` | Exactly 3 alpha characters, case-insensitive | Three-letter ISO country code (e.g. `EGY`, `USA`, `AUS`). Auto-uppercased. Must exist in the dataset or `404` is returned. |
-| `sensor` | `string` | `null` | `MODIS` or `VIIRS` (case-insensitive) | Filter by satellite sensor |
-| `min_latitude` | `float` | `null` | −90 ≤ value ≤ 90 | Bounding-box south edge |
-| `max_latitude` | `float` | `null` | −90 ≤ value ≤ 90, > `min_latitude` | Bounding-box north edge |
-| `min_longitude` | `float` | `null` | −180 ≤ value ≤ 180 | Bounding-box west edge |
-| `max_longitude` | `float` | `null` | −180 ≤ value ≤ 180, > `min_longitude` | Bounding-box east edge |
-
-> **Bounding-box rule:** All four bbox parameters must be supplied together. Providing only some returns `422`.  
-> **Date rule:** Providing only one of `start_date` / `end_date` returns `422`. Always send both or neither.  
-> **Date ordering rule:** `start_date` must be ≤ `end_date`, otherwise `422`.
-
-Bounding-box queries use PostGIS `ST_Intersects(geom, ST_MakeEnvelope(min_lon, min_lat, max_lon, max_lat, 4326))`.
-
----
-
-## 3. Error Responses
-
-All error bodies follow the shape:
-
-```json
-{ "detail": "<human-readable message>" }
-```
-
-| Status | Trigger |
-|---|---|
-| `401 Unauthorized` | Missing or invalid `X-API-Key` on the export endpoint (when `API_KEY` is configured) |
-| `404 Not Found` | `region_id` not in dataset, or `fire_id` does not exist |
-| `422 Unprocessable Entity` | Invalid parameter values, bad date range, partial bbox |
-| `500 Internal Server Error` | Unexpected query failure |
-| `503 Service Unavailable` | Database connection lost or pool unavailable |
-
----
-
-## 4. Root
-
-### `GET /`
-
-Returns a service info document. Not included in the OpenAPI schema.
-
-**Response `200`:**
-```json
-{
-  "name": "FireLens API",
-  "version": "1.0.0",
-  "docs": "/docs",
-  "health": "/api/v1/health",
-  "api": "/api/v1"
-}
-```
-
----
-
-## 5. Health
-
-### `GET /api/v1/health`
-
-**Tag:** `health`  
-**Summary:** Service and database health  
-**Auth:** None
-
-Executes a lightweight read-only query (`SELECT 1`) against the database pool to confirm the connection is live.
-
-**Response `200`:**
-```json
-{
-  "status": "ok",
-  "service": "FireLens API",
-  "version": "1.0.0",
-  "database": "connected"
-}
-```
-
-| Field | Type | Description |
-|---|---|---|
-| `status` | `"ok"` | Always `"ok"` on success |
-| `service` | `string` | Application name from settings |
-| `version` | `string` | Application version from settings |
-| `database` | `"connected"` | Always `"connected"` on success |
-
-**Response `503`:** Database is unavailable.
-
----
-
-### `GET /health` _(liveness alias)_
-
-Unversioned alias for container liveness probes. **Not in OpenAPI schema.**
-
-**Response `200`:**
-```json
-{ "status": "ok" }
-```
-
----
-
-### `GET /health/ready` _(readiness alias)_
-
-Unversioned alias for container readiness probes. Checks the database pool. **Not in OpenAPI schema.**
-
-**Response `200`:**
-```json
-{ "status": "ready", "database": "connected" }
-```
-
-**Response `503`:** Database is unavailable.
-
----
-
-## 6. Fires
-
-### `GET /api/v1/fires`
-
-**Tag:** `fires`  
-**Summary:** List fire detections  
-**Auth:** None
-
-Returns paginated, filtered fire detections from `public.fire_hotspots`.
-
-**Query Parameters:** All [shared filters](#2-shared-filters) plus:
-
-| Parameter | Type | Default | Constraints | Description |
-|---|---|---|---|---|
-| `limit` | `integer` | `100` | 1–1000 | Page size |
-| `offset` | `integer` | `0` | ≥ 0 | Number of records to skip |
-
-**Response `200`:**
 ```json
 {
   "data": [
     {
       "id": 1,
-      "latitude": 30.1234,
-      "longitude": 31.5678,
-      "acq_date": "2025-07-15",
-      "acq_time": 1030,
-      "acq_datetime_utc": "2025-07-15T10:30:00Z",
+      "source_detection_id": "example-viirs-001",
+      "latitude": 30.04,
+      "longitude": 31.23,
+      "acq_date": "2020-07-15",
       "sensor": "VIIRS",
       "confidence": "high",
       "confidence_raw": "h",
-      "satellite": "NPP",
-      "version": "2.0NRT",
-      "daynight": "D",
-      "brightness": 335.5,
-      "brightness_thermal": 295.3,
-      "scan": 0.39,
-      "track": 0.36,
-      "frp": 8.3,
-      "country_code": "EGY",
-      "country_name": "Egypt",
-      "continent": "Africa",
-      "spatial_grid_id": "grid-id-string"
+      "country_code": "EGY"
     }
   ],
-  "pagination": {
-    "limit": 100,
-    "offset": 0,
-    "total": 352
-  }
+  "pagination": {"limit": 100, "offset": 0, "total": 1}
 }
 ```
 
-**`FireRecord` fields:**
+Optional fire fields are omitted from this example. `confidence` is normalized
+to `high`, `nominal`, `low`, or `unknown`; `confidence_raw` preserves the stored
+value. `GET /fires/{id}` returns one `FireRecord` directly or 404.
 
-| Field | Type | Nullable | Description |
-|---|---|---|---|
-| `id` | `integer` | No | Primary key |
-| `latitude` | `float` | No | −90 to 90 |
-| `longitude` | `float` | No | −180 to 180 |
-| `acq_date` | `date` | No | Acquisition date |
-| `acq_time` | `integer` | Yes | FIRMS acquisition time in `HHMM` format |
-| `acq_datetime_utc` | `datetime` | Yes | Combined UTC acquisition datetime |
-| `sensor` | `string` | Yes | `"MODIS"` or `"VIIRS"` |
-| `confidence` | `string` | No | Normalized: `"high"`, `"nominal"`, `"low"`, `"unknown"` |
-| `confidence_raw` | `string` | Yes | Original value from database before normalization |
-| `satellite` | `string` | Yes | Satellite name (e.g. `"NPP"`, `"NOAA-20"`) |
-| `version` | `string` | Yes | FIRMS collection version |
-| `daynight` | `string` | Yes | `"D"` (day) or `"N"` (night) |
-| `brightness` | `float` | Yes | Channel 21/22 brightness temperature (K), MODIS only |
-| `brightness_thermal` | `float` | Yes | Channel 31 brightness temperature (K), MODIS only |
-| `scan` | `float` | Yes | Along-scan pixel size (km) |
-| `track` | `float` | Yes | Along-track pixel size (km) |
-| `frp` | `float` | Yes | Fire Radiative Power (MW) |
-| `country_code` | `string` | Yes | Three-letter ISO country code |
-| `country_name` | `string` | Yes | Full country name |
-| `continent` | `string` | Yes | Continent name |
-| `spatial_grid_id` | `string` | Yes | Spatial grid cell identifier |
+`id` is the numeric database identity used by `/fires/{id}`.
+`source_detection_id` is a separate nullable **string**. Event membership joins
+use `fire_event_members.detection_id = fire_hotspots.source_detection_id`;
+overlap joins use `fire_overlap_pairs.detection_id_a` and `detection_id_b`
+against that same text column on each side. Never convert these identifiers
+to numbers or join them to `fire_hotspots.id`. Event and overlap routes are
+not currently exposed by this API.
 
-**`Pagination` fields:**
+The response also includes nullable `bright_t31` (MODIS), `bright_ti4` and
+`bright_ti5` (VIIRS), `instrument`, `source_file`, `fire_type`,
+`coordinate_reference_system`, `hour`, `minute`, `year`, `month`, `day`,
+`day_of_year`, `grid_lat`, `grid_lon`, and `created_at`. Missing values remain
+JSON `null`; `confidence_raw` and `version` retain their stored strings.
+Normalized `confidence` remains `unknown` when the raw value is missing or
+unrecognized. FRP is in MW. `acq_time` is integer HHMM (`32` means 00:32 UTC);
+prefer the timezone-bearing `acq_datetime_utc` for timelines. Use
+`[longitude, latitude]` for GeoJSON points. Bounding-box filters use these
+coordinates when the nullable PostGIS `geom` is missing.
 
-| Field | Type | Description |
-|---|---|---|
-| `limit` | `integer` | Page size used |
-| `offset` | `integer` | Offset used |
-| `total` | `integer` | Total matching records (before pagination) |
+`GET /regions` returns `{ "data": RegionRecord[], "total": number }`. Its IDs
+are three-letter country codes. `GET /regions/catalog` returns persisted region
+rows with integer `id`, `name`, `slug`, optional `country_code`, description,
+and optional geographic bounds and `created_at`. Obtain integer IDs from this
+catalog instead of assuming a particular country has ID 1.
 
-**Error responses:** `404` if `region_id` not found · `422` on invalid params · `503` on DB failure
+`GET /calendar` returns the unchanged raw-detection contract:
 
----
-
-### `GET /api/v1/fires/{fire_id}`
-
-**Tag:** `fires`  
-**Summary:** Get one fire detection  
-**Auth:** None
-
-**Path parameter:**
-
-| Parameter | Type | Constraints | Description |
-|---|---|---|---|
-| `fire_id` | `integer` | ≥ 1 | Primary key of the detection record |
-
-**Response `200`:** A single [`FireRecord`](#firelist-fields) object (same shape as one item in the `data` array above).
-
-**Error responses:** `404` if the detection does not exist · `503` on DB failure
-
----
-
-## 7. Regions
-
-### `GET /api/v1/regions`
-
-**Tag:** `regions`  
-**Summary:** List countries represented in the dataset  
-**Auth:** None
-
-Regions are derived **at query time** from distinct `country_code` values in `public.fire_hotspots`. Counts, bounding boxes, and centroids are computed with PostGIS. This endpoint accepts **no query parameters**.
-
-**Response `200`:**
-```json
-{
-  "data": [
-    {
-      "id": "EGY",
-      "country_code": "EGY",
-      "name": "Egypt",
-      "continent": "Africa",
-      "hemisphere": "northern",
-      "hotspot_count": 12,
-      "bounding_box": {
-        "min_latitude": 22.0,
-        "min_longitude": 24.7,
-        "max_latitude": 31.7,
-        "max_longitude": 36.9
-      },
-      "centroid": {
-        "latitude": 26.8,
-        "longitude": 30.8
-      }
-    }
-  ],
-  "total": 15
-}
-```
-
-**`RegionRecord` fields:**
-
-| Field | Type | Nullable | Description |
-|---|---|---|---|
-| `id` | `string` | No | Three-letter ISO country code (same as `country_code`). Use this as `region_id` in other calls. |
-| `country_code` | `string` | No | Three-letter ISO country code |
-| `name` | `string` | No | Full country name |
-| `continent` | `string` | Yes | Continent name |
-| `hemisphere` | `"northern" \| "southern"` | Yes | Based on the centroid latitude |
-| `hotspot_count` | `integer` | No | Number of detections in the dataset |
-| `bounding_box` | `BoundingBox` | Yes | PostGIS-computed geographic extent |
-| `centroid` | `Centroid` | Yes | PostGIS-computed centroid of all hotspot geometries |
-
-**`BoundingBox` fields:** `min_latitude`, `min_longitude`, `max_latitude`, `max_longitude` (all floats).  
-**`Centroid` fields:** `latitude`, `longitude` (both floats).
-
-**Response `200` envelope:**
-
-| Field | Type | Description |
-|---|---|---|
-| `data` | `RegionRecord[]` | List of region records |
-| `total` | `integer` | Count of records in `data` |
-
-**Error responses:** `503` on DB failure
-
----
-
-## 8. Calendar
-
-### `GET /api/v1/calendar`
-
-**Tag:** `calendar`  
-**Summary:** Daily detection calendar  
-**Auth:** None
-
-Returns zero-filled daily fire counts. Days with no detections are included with `fire_count: 0`. Counts are generated in PostgreSQL using `generate_series` + `LEFT JOIN`.
-
-**Query Parameters:** All [shared filters](#2-shared-filters). No extra parameters.
-
-**Default date range:** When both `start_date` and `end_date` are omitted, the latest 30 days represented in the filtered dataset are used. The range is capped at `MAX_CALENDAR_DAYS` (default 366).
-
-**Response `200`:**
 ```json
 {
   "status": "ok",
-  "data": [
-    { "date": "2025-07-01", "fire_count": 0 },
-    { "date": "2025-07-02", "fire_count": 3 },
-    { "date": "2025-07-03", "fire_count": 1 }
-  ],
+  "data": [{"date": "2020-07-02", "fire_count": 3}],
   "meta": {
-    "start_date": "2025-07-01",
-    "end_date": "2025-07-31",
+    "start_date": "2020-07-01",
+    "end_date": "2020-07-31",
     "total_days": 31,
-    "total_fires": 42,
+    "total_fires": 3,
     "region_id": "EGY",
     "sensor": null
   }
 }
 ```
 
-**`CalendarResponse` fields:**
+The top-level seasonal, comparison, and anomaly endpoints also remain based on
+raw `fire_hotspots` records. Their response models are `SeasonalResponse`,
+`ComparisonResponse`, and `AnomalyResponse` in the generated OpenAPI schema.
 
-| Field | Type | Description |
-|---|---|---|
-| `status` | `"ok" \| "no_data"` | `"no_data"` when no records match the filters |
-| `data` | `CalendarDay[]` | Array of one entry per calendar day, ordered by date |
-| `meta` | `CalendarMeta` | Filter echo and aggregate stats |
+## Harmonized activity
 
-**`CalendarDay` fields:**
+### `GET /harmonization`
 
-| Field | Type | Description |
-|---|---|---|
-| `date` | `date` | The calendar day (`YYYY-MM-DD`) |
-| `fire_count` | `integer ≥ 0` | Number of detections (zero-filled) |
+Filters: `start_date`, `end_date`, `region_pk`, `spatial_grid_id`, and
+`method_version`. Pagination: `limit` (1–1000, default 100) and `offset`
+(default 0).
 
-**`CalendarMeta` fields:**
+The imported 2018–2020 dataset uses **`daily-grid-modis-equivalent-v1`**.
+Use that value for the corrected frontend views. The old
+`daily-grid-raw-counts-v1` filter returns no imported activity rows. Omitting
+`method_version` includes all methods; the API does not silently substitute a
+method for an explicitly supplied filter. Response envelope:
 
-| Field | Type | Description |
-|---|---|---|
-| `start_date` | `date \| null` | Actual start of the returned range |
-| `end_date` | `date \| null` | Actual end of the returned range |
-| `total_days` | `integer` | Number of calendar days in `data` |
-| `total_fires` | `integer` | Sum of all `fire_count` values |
-| `region_id` | `string \| null` | Applied region filter |
-| `sensor` | `string \| null` | Applied sensor filter |
-
-**Error responses:** `404` if `region_id` not found · `422` on invalid date range · `503` on DB failure
-
----
-
-## 9. Analytics
-
-All analytics routes share the same [shared filters](#2-shared-filters) and the same error responses (`404` region not found, `422` invalid range, `503` DB failure).
-
----
-
-### `GET /api/v1/analytics/seasonal`
-
-**Tag:** `analytics`  
-**Summary:** Hemisphere-aware seasonal aggregates  
-**Auth:** None
-
-Returns monthly detection counts split by hemisphere, plus derived meteorological season aggregates. Each hotspot is classified by its own latitude:
-
-- `latitude < 0` → `"southern"` hemisphere
-- `latitude >= 0` → `"northern"` hemisphere (equator → northern)
-
-Seasons: `DJF` (Dec–Feb), `MAM` (Mar–May), `JJA` (Jun–Aug), `SON` (Sep–Nov). December is assigned to the DJF season ending the **following year**.
-
-**Query Parameters:** All [shared filters](#2-shared-filters). When dates are omitted, the latest year in the filtered dataset is used.
-
-**Response `200`:**
 ```json
 {
   "status": "ok",
   "data": [
     {
-      "year": 2025,
-      "month": 7,
-      "month_name": "July",
-      "hemisphere": "northern",
-      "fire_count": 48
+      "id": 1,
+      "region_id": 1,
+      "country_code": "EGY",
+      "activity_date": "2020-07-15",
+      "spatial_grid_id": "grid-001",
+      "modis_count": 10,
+      "viirs_count": 18,
+      "harmonized_count": 5.819,
+      "correction_factor": 0.091,
+      "uncertainty": 0.027,
+      "method_version": "daily-grid-modis-equivalent-v1",
+      "created_at": "2020-07-16T12:00:00Z"
     }
   ],
-  "seasonal": [
+  "pagination": {"limit": 100, "offset": 0, "total": 1}
+}
+```
+
+Values are illustrative, not a fitted-metrics report.
+`harmonized_count = (modis_count + correction_factor * viirs_count) / 2`
+is a fractional hotspot detection index. Preserve its decimals in frontend
+state, calculations, and chart data. `modis_count` and `viirs_count` are raw
+integer counts. Region assignment, country code, grid ID, corrected count,
+factor, and uncertainty may be `null`.
+
+`uncertainty = viirs_count * SE(correction_factor) / 2` covers variation in
+the country factor estimated with month blocks. It excludes coverage, clouds,
+missed detections, and grid-level predictive error. Rows sharing a country
+factor share uncertainty; do not combine their errors as independent values.
+
+### `GET /harmonization/calendar`
+
+Accepts the same date and activity filters. With no dates, returns the latest
+30 days in the filtered dataset. Date ranges are capped by
+`MAX_CALENDAR_DAYS` (default 366). Rows are separate by date and
+`method_version`:
+
+```json
+{
+  "status": "ok",
+  "data": [
     {
-      "season_year": 2025,
-      "season": "JJA",
-      "season_name": "Summer (JJA)",
-      "hemisphere": "northern",
-      "fire_count": 148
-    },
-    {
-      "season_year": 2025,
-      "season": "JJA",
-      "season_name": "Winter (JJA)",
-      "hemisphere": "southern",
-      "fire_count": 7
+      "date": "2020-07-02",
+      "method_version": "daily-grid-modis-equivalent-v1",
+      "harmonized_activity": 1.1365,
+      "modis_count": 2,
+      "viirs_count": 3,
+      "grid_records": 1,
+      "uncertainty": 0.0045
     }
   ],
   "meta": {
-    "start_date": "2025-01-01",
-    "end_date": "2025-12-31",
-    "total_fires": 352,
-    "region_id": null,
-    "sensor": null,
-    "hemisphere_method": "latitude < 0 → southern, >= 0 → northern",
-    "season_method": "meteorological DJF/MAM/JJA/SON"
+    "start_date": "2020-07-01",
+    "end_date": "2020-07-30",
+    "total_days": 30,
+    "total_harmonized_activity": 1.1365,
+    "total_modis_count": 2,
+    "total_viirs_count": 3,
+    "region_pk": 1,
+    "spatial_grid_id": null,
+    "method_versions": ["daily-grid-modis-equivalent-v1"],
+    "aggregation_method": "..."
   }
 }
 ```
 
-**`SeasonalResponse` fields:**
+Daily activity and raw source counts are summed across matching grid rows within
+each method version. Dates without grid records have `grid_records: 0`, zero raw
+counts, and `harmonized_activity: null`. If any matching grid row has a null
+corrected count, that day's corrected total and the calendar's overall
+corrected total remain null. A stored numeric zero remains zero.
+When one day/version includes multiple grid rows,
+`uncertainty` is `null`; the API does not invent an uncertainty aggregation
+rule. Totals across multiple method versions are also `null` to avoid combining
+different corrections.
 
-| Field | Type | Description |
-|---|---|---|
-| `status` | `"ok" \| "no_data"` | |
-| `data` | `SeasonalMonthlyPoint[]` | Monthly counts per hemisphere |
-| `seasonal` | `SeasonalPoint[]` | Season-level aggregates per hemisphere |
-| `meta` | `SeasonalMeta` | Filter echo and methodology |
+### Harmonized analytics
 
-**`SeasonalMonthlyPoint` fields:**
+The harmonized endpoints live under `/harmonization/analytics/` so the existing
+raw analytics keep their response and meaning:
 
-| Field | Type | Description |
-|---|---|---|
-| `year` | `integer` | Calendar year |
-| `month` | `integer` | 1–12 |
-| `month_name` | `string` | e.g. `"July"` |
-| `hemisphere` | `"northern" \| "southern"` | |
-| `fire_count` | `integer ≥ 0` | |
+- `/seasonal` returns monthly totals and DJF/MAM/JJA/SON codes, separated by
+  method version. December belongs to the season ending in the next year.
+- `/comparison` compares monthly observed totals with full-month totals from
+  prior years of the same method version. Its observation period must fit in
+  one calendar year.
+- `/anomalies` compares monthly totals with the same calendar month in prior
+  years, using the median, MAD, and the modified Z-score.
 
-**`SeasonalPoint` fields:**
+Dates default to the latest represented year for seasonal and historical
+analytics. Comparison and anomalies require one calendar year. The minimum
+history defaults to three years; insufficient statistics remain `null` and are
+marked `insufficient_history`. Each endpoint accepts the harmonized filters
+above. If `method_version` is omitted, output rows remain separate by version.
 
-| Field | Type | Description |
-|---|---|---|
-| `season_year` | `integer` | The year the season *ends* (DJF Dec is in the following year) |
-| `season` | `string` | Code: `DJF`, `MAM`, `JJA`, or `SON` |
-| `season_name` | `string` | Hemisphere-aware label (e.g. `"Summer (JJA)"`, `"Winter (JJA)"`) |
-| `hemisphere` | `"northern" \| "southern"` | |
-| `fire_count` | `integer ≥ 0` | |
+The harmonized table does not contain grid latitude. Its seasonal endpoint
+therefore returns season codes without the hemisphere-specific names used by
+raw-fire analytics.
 
-**Season name reference:**
+## Validation
 
-| Code | Northern | Southern |
-|---|---|---|
-| `DJF` | Winter (DJF) | Summer (DJF) |
-| `MAM` | Spring (MAM) | Autumn (MAM) |
-| `JJA` | Summer (JJA) | Winter (JJA) |
-| `SON` | Autumn (SON) | Spring (SON) |
+### `GET /validation`
 
----
+Accepts `region_pk`, `method_version`, `start_date`, `end_date`, `limit`, and
+`offset`. Date filters return reports whose validation period overlaps the
+requested interval. Fields include `validation_period_start`,
+`validation_period_end`, `mae`, `rmse`, `bias`, `sample_size`, and `notes`.
+The imported reports use **`pair-integrity-1km-30min-v1`**. They summarize
+candidate-pair QA; `sample_size` counts validated overlap pairs. Their nullable
+`mae`, `rmse`, and `bias` are not the held-out 2020 calibration metrics.
+Request validation separately with its own method version; joining reports
+to activity by equal `method_version` produces no match in this dataset.
+Region, country code, validation dates, metrics, sample size, and notes can be
+null and must remain null in the frontend.
 
-### `GET /api/v1/analytics/comparison`
+The envelope is `{ "status": "ok", "data": ValidationRecord[], "pagination":
+{ "limit": number, "offset": number, "total": number } }`.
 
-**Tag:** `analytics`  
-**Summary:** Compare activity with prior-year baselines  
-**Auth:** None
+## CSV exports
 
-Compares selected-period detections against historical totals from prior years. Requires at least **3 prior years** of data before statistics are computed. Periods must fall within a **single calendar year**.
+- `/exports/fires` exports raw detections, including the appended source text
+  identifier, native sensor bands, source metadata, date/grid parts, and created
+  timestamp. Read CSV columns by header name; nulls are empty cells.
+- `/exports/harmonization` exports the filtered corrected activity rows.
+- `/exports/validation` exports the filtered validation reports.
 
-**Query Parameters:** All [shared filters](#2-shared-filters) plus:
+All exports stream from server-side cursors, set an attachment filename, and
+sanitize text cells that could be interpreted as spreadsheet formulas. Include
+`X-API-Key` when `API_KEY` is configured.
 
-| Parameter | Type | Default | Values | Description |
-|---|---|---|---|---|
-| `group_by` | `string` | `"month"` | `"month"` or `"season"` | Historical grouping granularity |
+## Frontend integration
 
-When dates are omitted, the latest year in the filtered dataset is used.
+Generate full TypeScript types from `/openapi.json`. JSON dates are `YYYY-MM-DD`
+strings; timestamps include a timezone. Represent nullable numbers as
+`number | null`, and display null as unavailable instead of converting it to
+zero. Distinguish an empty result (`data: []`) from a network error and from
+`insufficient_history` or `insufficient_variance` analytics results. The
+2018–2020 dataset has at most two prior years for 2020, fewer than the default
+three-year history requirement.
 
-**Response `200` (sufficient history):**
-```json
-{
-  "status": "ok",
-  "message": "Comparison computed successfully.",
-  "meta": {
-    "observed_start_date": "2025-01-01",
-    "observed_end_date": "2025-12-31",
-    "group_by": "month",
-    "required_prior_years": 3,
-    "available_prior_years": 4,
-    "baseline_method": "mean and median across distinct prior years",
-    "region_id": null,
-    "sensor": null
-  },
-  "data": [
-    {
-      "period": "2025-07",
-      "month": 7,
-      "season": null,
-      "season_name": null,
-      "hemisphere": null,
-      "observed_count": 48,
-      "observed_years": 1,
-      "historical_mean": 32.3,
-      "historical_median": 31.0,
-      "difference_percent": 48.6,
-      "baseline_years": 4,
-      "status": "ok"
-    }
-  ]
+Fetch the catalog, resolve the selected country to its integer ID, and request
+activity and QA independently. This example uses the latest represented dates
+instead of the current date, which is outside the imported study period:
+
+```ts
+const API_BASE = "http://127.0.0.1:8000/api/v1";
+const ACTIVITY_METHOD = "daily-grid-modis-equivalent-v1";
+const QA_METHOD = "pair-integrity-1km-30min-v1";
+
+async function getJson<T>(path: string): Promise<T> {
+  const response = await fetch(`${API_BASE}${path}`);
+  if (!response.ok) throw new Error(`FireLens request failed: ${response.status}`);
+  return response.json() as Promise<T>;
 }
-```
 
-**Response `200` (insufficient history — currently always returned):**
-```json
-{
-  "status": "insufficient_history",
-  "message": "Insufficient prior-year data for statistical comparison.",
-  "meta": { "...": "...", "available_prior_years": 1 },
-  "data": [
-    {
-      "period": "2025-07",
-      "observed_count": 48,
-      "historical_mean": null,
-      "historical_median": null,
-      "difference_percent": null,
-      "baseline_years": 1,
-      "status": "insufficient_history"
-    }
-  ]
-}
-```
+type CatalogRegion = { id: number; country_code: string | null };
+const catalog = await getJson<{ data: CatalogRegion[]; total: number }>(
+  "/regions/catalog"
+);
+const egypt = catalog.data.find(region => region.country_code === "EGY");
+if (!egypt) throw new Error("Egypt is unavailable in the region catalog");
 
-> **Current behavior:** Always returns `insufficient_history` because only one year of data exists (2025-06-20 → 2025-10-08).
-
-**`ComparisonResponse` fields:**
-
-| Field | Type | Description |
-|---|---|---|
-| `status` | `"ok" \| "insufficient_history" \| "no_data"` | Top-level status |
-| `message` | `string` | Human-readable status explanation |
-| `meta` | `ComparisonMeta` | Filter echo and baseline availability |
-| `data` | `ComparisonRecord[]` | Per-group records |
-
-**`ComparisonRecord` fields:**
-
-| Field | Type | Nullable | Description |
-|---|---|---|---|
-| `period` | `string` | No | Label, e.g. `"2025-07"` or `"2025-JJA-northern"` |
-| `month` | `integer` | Yes | 1–12, when `group_by=month` |
-| `season` | `string` | Yes | Season code, when `group_by=season` |
-| `season_name` | `string` | Yes | Hemisphere-aware label, when `group_by=season` |
-| `hemisphere` | `string` | Yes | `"northern"` or `"southern"`, when `group_by=season` |
-| `observed_count` | `integer` | No | Detections in the selected period |
-| `observed_years` | `integer` | No | Number of years in the observed window |
-| `historical_mean` | `float` | Yes | Mean across prior years; `null` if insufficient history |
-| `historical_median` | `float` | Yes | Median across prior years; `null` if insufficient history |
-| `difference_percent` | `float` | Yes | `(observed − median) / median × 100`; `null` if insufficient history |
-| `baseline_years` | `integer` | No | Number of prior years available for this group |
-| `status` | `"ok" \| "insufficient_history"` | No | Per-row status |
-
----
-
-### `GET /api/v1/analytics/anomalies`
-
-**Tag:** `analytics`  
-**Summary:** Robust monthly anomaly detection  
-**Auth:** None
-
-Computes a **modified Z-score** for each calendar month in the selected period by comparing the observed count to the same month in prior years.
-
-**Formula:** `modified_z = 0.6745 × (observed − median) / MAD`
-
-**Severity thresholds (configurable via env vars):**
-- `|score| ≥ 2.5` → `"moderate"`
-- `|score| ≥ 3.5` → `"high"`
-
-Requires at least **3 prior years** per month. `MAD = 0` with `observed ≠ median` is reported as `insufficient_variance`. Periods must fall within a **single calendar year**.
-
-**Query Parameters:** All [shared filters](#2-shared-filters). When dates are omitted, the latest year in the filtered dataset is used.
-
-**Response `200`:**
-```json
-{
-  "status": "ok",
-  "message": "Anomaly detection computed successfully.",
-  "meta": {
-    "observed_start_date": "2025-01-01",
-    "observed_end_date": "2025-12-31",
-    "required_prior_years": 3,
-    "available_prior_years": 4,
-    "method": "modified_z_score",
-    "score_formula": "0.6745 * (observed - median) / MAD",
-    "moderate_threshold": 2.5,
-    "high_threshold": 3.5,
-    "region_id": null,
-    "sensor": null
-  },
-  "data": [
-    {
-      "date": "2025-07-01",
-      "period": "2025-07",
-      "month": 7,
-      "observed_count": 48,
-      "historical_mean": 32.3,
-      "historical_median": 31.0,
-      "mad": 4.2,
-      "anomaly_score": 2.73,
-      "severity": "moderate",
-      "direction": "above",
-      "is_anomaly": true,
-      "baseline_years": 4,
-      "status": "ok"
-    }
-  ]
-}
-```
-
-**`AnomalyResponse` fields:**
-
-| Field | Type | Description |
-|---|---|---|
-| `status` | `"ok" \| "insufficient_history" \| "no_data"` | Top-level status |
-| `message` | `string` | Human-readable explanation |
-| `meta` | `AnomalyMeta` | Methodology and threshold values |
-| `data` | `AnomalyRecord[]` | Per-month anomaly records |
-
-**`AnomalyRecord` fields:**
-
-| Field | Type | Nullable | Description |
-|---|---|---|---|
-| `date` | `date` | No | First day of the month |
-| `period` | `string` | No | `"YYYY-MM"` label |
-| `month` | `integer` | No | 1–12 |
-| `observed_count` | `integer` | No | Detections in this month |
-| `historical_mean` | `float` | Yes | Mean of same month across prior years |
-| `historical_median` | `float` | Yes | Median of same month across prior years |
-| `mad` | `float` | Yes | Median Absolute Deviation |
-| `anomaly_score` | `float` | Yes | Modified Z-score; `null` if not computable |
-| `severity` | `"normal" \| "moderate" \| "high"` | Yes | `null` if not computable |
-| `direction` | `"above" \| "below" \| "normal"` | Yes | `null` if not computable |
-| `is_anomaly` | `boolean` | No | `true` if severity is `moderate` or `high` |
-| `baseline_years` | `integer` | No | Prior years available for this month |
-| `status` | `"ok" \| "insufficient_history" \| "insufficient_variance"` | No | Per-row computation status |
-
-**Row status values:**
-
-| Value | Meaning |
-|---|---|
-| `ok` | Score computed normally |
-| `insufficient_history` | Fewer than 3 prior years available for this month |
-| `insufficient_variance` | MAD = 0 and observed ≠ median (division by zero avoided) |
-
-> **Current behavior:** Always returns `insufficient_history` at the top level because only one year of data exists.
-
----
-
-## 10. Exports
-
-### `GET /api/v1/exports/fires`
-
-**Tag:** `exports`  
-**Summary:** Export fire detections as CSV  
-**Auth:** `X-API-Key` header required **only if** `API_KEY` is configured server-side
-
-Streams all matching detections as a downloadable CSV attachment. Uses an asyncpg server-side cursor with configurable batch size (`EXPORT_BATCH_SIZE`, default 500), so the full result set is never loaded into memory.
-
-**Query Parameters:** All [shared filters](#2-shared-filters). No pagination parameters (`limit` / `offset` are ignored — all matching rows are exported).
-
-**Request headers (conditional):**
-
-| Header | Required when | Description |
-|---|---|---|
-| `X-API-Key` | `API_KEY` env var is set | Shared secret for export access |
-
-**Response `200`:**
-
-| Property | Value |
-|---|---|
-| `Content-Type` | `text/csv; charset=utf-8` |
-| `Content-Disposition` | `attachment; filename="firelens_fires_<UTC-timestamp>.csv"` |
-| `Cache-Control` | `no-store` |
-| `X-Content-Type-Options` | `nosniff` |
-
-The CSV includes a header row followed by one row per detection. Text cells starting with `=`, `+`, `-`, `@`, tab (`\t`), or carriage return (`\r`) (after leading whitespace) are prefixed with `'` to prevent spreadsheet formula injection.
-
-**Example filename:** `firelens_fires_20251015_143022.csv`
-
-**Client-side download (fetch):**
-```js
-const response = await fetch('/api/v1/exports/fires?region_id=EGY', {
-  headers: { 'X-API-Key': 'your-key' } // omit if no key configured
+const activityQuery = new URLSearchParams({
+  region_pk: String(egypt.id), method_version: ACTIVITY_METHOD
 });
-const blob = await response.blob();
-const url = URL.createObjectURL(blob);
-const a = document.createElement('a');
-a.href = url;
-a.download = response.headers.get('Content-Disposition')
-  .match(/filename="(.+)"/)[1];
-a.click();
+const qaQuery = new URLSearchParams({
+  region_pk: String(egypt.id), method_version: QA_METHOD
+});
+// ActivityCalendarResponse / ValidationListResponse are generated OpenAPI types.
+const [calendar, validation] = await Promise.all([
+  getJson<ActivityCalendarResponse>(`/harmonization/calendar?${activityQuery}`),
+  getJson<ValidationListResponse>(`/validation?${qaQuery}`)
+]);
+const chartPoints = calendar.data.map(row => ({
+  date: row.date,
+  value: row.harmonized_activity // Preserve fractional values and null gaps.
+}));
 ```
 
-**Error responses:** `401` if key required and missing/wrong · `404` if `region_id` not found · `422` on invalid params · `503` on DB failure
+For explicit study ranges, add both `start_date=2020-01-01` and
+`end_date=2020-12-31` to calendar or analytics requests. On `/fires`, use
+`region_id=EGY` instead of `region_pk`. Paginated list routes return
+`pagination.total`; advance `offset` by the returned `pagination.limit` until
+the full result is loaded. Configure the backend's `CORS_ORIGINS` with the
+frontend's origin when running on a different port.
 
----
+## Error responses
 
-## 11. Schema Reference
-
-### `FireFilters` (shared query model)
-
-```
-start_date?    date              Inclusive lower bound
-end_date?      date              Inclusive upper bound
-region_id?     string[3 alpha]   Three-letter country code, auto-uppercased
-sensor?        "MODIS"|"VIIRS"   Case-insensitive
-min_latitude?  float[-90..90]    Bbox south edge  ─┐
-max_latitude?  float[-90..90]    Bbox north edge   │ All four required together
-min_longitude? float[-180..180]  Bbox west edge    │ min < max enforced
-max_longitude? float[-180..180]  Bbox east edge   ─┘
-```
-
-### `FireRecord`
-
-```
-id                  integer         Primary key
-latitude            float           WGS84 latitude
-longitude           float           WGS84 longitude
-acq_date            date            Acquisition date
-acq_time?           integer|null    HHMM format
-acq_datetime_utc?   datetime|null   UTC acquisition datetime
-sensor?             string|null
-confidence          ConfidenceLevel Normalized: high|nominal|low|unknown
-confidence_raw?     string|null     Pre-normalization value
-satellite?          string|null
-version?            string|null     FIRMS collection version
-daynight?           string|null     "D" or "N"
-brightness?         float|null      Channel 21/22 temp (K), MODIS
-brightness_thermal? float|null      Channel 31 temp (K), MODIS
-scan?               float|null      Along-scan pixel size (km)
-track?              float|null      Along-track pixel size (km)
-frp?                float|null      Fire Radiative Power (MW)
-country_code?       string|null
-country_name?       string|null
-continent?          string|null
-spatial_grid_id?    string|null
-```
-
-### `ConfidenceLevel` (enum)
-
-| Value | Description |
-|---|---|
-| `"high"` | MODIS ≥ 80 or VIIRS `"h"` |
-| `"nominal"` | MODIS 40–79 or VIIRS `"n"` |
-| `"low"` | MODIS < 40 or VIIRS `"l"` |
-| `"unknown"` | Missing, null, or unrecognized value |
-
----
-
-## 12. Confidence Normalization
-
-| Sensor | Raw value | Normalized |
-|---|---|---|
-| MODIS | ≥ 80 | `high` |
-| MODIS | 40–79 | `nominal` |
-| MODIS | < 40 | `low` |
-| VIIRS | `"h"` | `high` |
-| VIIRS | `"n"` | `nominal` |
-| VIIRS | `"l"` | `low` |
-| Any | missing / unrecognized | `unknown` |
-
-Unknown values are **preserved**, never guessed or fabricated.
-
----
-
-## 13. Season Classification
-
-Each detection is assigned a hemisphere from its own latitude, then a season from its acquisition month.
-
-| Code | Months | Northern name | Southern name |
-|---|---|---|---|
-| `DJF` | Dec, Jan, Feb | Winter (DJF) | Summer (DJF) |
-| `MAM` | Mar, Apr, May | Spring (MAM) | Autumn (MAM) |
-| `JJA` | Jun, Jul, Aug | Summer (JJA) | Winter (JJA) |
-| `SON` | Sep, Oct, Nov | Autumn (SON) | Spring (SON) |
-
-> **December rule:** December is assigned to the DJF season that ends in the **following year**, so a detection on 2025-12-15 belongs to `season_year=2026, season=DJF`.
-
----
-
-## Quick Reference
-
-```bash
-# Health
-curl http://127.0.0.1:8000/api/v1/health
-
-# Fires — paginated, filtered
-curl "http://127.0.0.1:8000/api/v1/fires?start_date=2025-07-01&end_date=2025-07-31&region_id=EGY&limit=25"
-
-# Fires — bounding box
-curl "http://127.0.0.1:8000/api/v1/fires?min_latitude=25&max_latitude=35&min_longitude=25&max_longitude=35&sensor=VIIRS"
-
-# Single detection
-curl http://127.0.0.1:8000/api/v1/fires/1
-
-# Regions
-curl http://127.0.0.1:8000/api/v1/regions
-
-# Calendar (zero-filled daily counts)
-curl "http://127.0.0.1:8000/api/v1/calendar?start_date=2025-10-01&end_date=2025-10-08&region_id=EGY"
-
-# Seasonal analytics
-curl "http://127.0.0.1:8000/api/v1/analytics/seasonal?start_date=2025-01-01&end_date=2025-12-31"
-
-# Historical comparison (by season)
-curl "http://127.0.0.1:8000/api/v1/analytics/comparison?start_date=2025-01-01&end_date=2025-12-31&group_by=season"
-
-# Anomaly detection
-curl "http://127.0.0.1:8000/api/v1/analytics/anomalies?start_date=2025-01-01&end_date=2025-12-31"
-
-# CSV export
-curl -OJ "http://127.0.0.1:8000/api/v1/exports/fires?region_id=EGY"
-
-# CSV export with API key
-curl -OJ -H "X-API-Key: your-key" "http://127.0.0.1:8000/api/v1/exports/fires"
-```
-
+Validation errors use HTTP 422. Unknown fire IDs or region identifiers use
+404. Database connection failures use 503; query failures use a generic 500.
+Date ranges for comparison/anomaly analytics must stay within one calendar
+year.

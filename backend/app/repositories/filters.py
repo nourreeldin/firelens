@@ -50,8 +50,14 @@ def build_fire_filters(filters: FireFilters, *, param_offset: int = 0) -> WhereB
 
     bbox = filters.bbox
     if bbox is not None:
+        # Keep geom directly visible to its GiST index. Only missing geometries
+        # use coordinates, and both OR branches remain under the other filters.
         builder.add(
-            "ST_Intersects(geom, ST_MakeEnvelope({}, {}, {}, {}, 4326))",
+            "((geom IS NOT NULL AND "
+            "ST_Intersects(geom, ST_MakeEnvelope({0}, {1}, {2}, {3}, 4326))) "
+            "OR (geom IS NULL AND "
+            "ST_Intersects(ST_SetSRID(ST_MakePoint(longitude, latitude), 4326), "
+            "ST_MakeEnvelope({0}, {1}, {2}, {3}, 4326))))",
             *bbox,
         )
 

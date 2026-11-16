@@ -44,9 +44,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         title=app_settings.app_name,
         version=app_settings.app_version,
         description=(
-            "Read-only API for exploring harmonized MODIS and VIIRS active-fire "
-            "detections from NASA FIRMS. Queries use parameterized raw SQL over "
-            "public.fire_hotspots with PostGIS spatial filtering."
+            "Read-only API for exploring NASA FIRMS fire detections and separate "
+            "MODIS/VIIRS harmonized activity and validation records. Raw detection "
+            "routes use public.fire_hotspots; corrected activity and validation "
+            "routes use their dedicated database tables. Queries use parameterized "
+            "SQL."
         ),
         lifespan=lifespan,
         # Serve the same generated OpenAPI reference with FireLens styling.
@@ -64,7 +66,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def swagger_docs() -> HTMLResponse:
         """Serve the custom FireLens view backed by the live OpenAPI schema."""
         page = (DOCS_DIR / "docs.html").read_text(encoding="utf-8")
-        page = page.replace("__OPENAPI_URL__", application.openapi_url or "/openapi.json")
+        page = page.replace(
+            "__OPENAPI_URL__", application.openapi_url or "/openapi.json"
+        )
         return HTMLResponse(page)
 
     # Keep route dependencies on the same settings instance used by lifespan.
@@ -152,7 +156,3 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
 
 app = create_app()
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("app.main:app", host="127.0.0.1", port=8000, reload=True)

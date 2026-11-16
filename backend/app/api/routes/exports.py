@@ -6,10 +6,16 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 from starlette.responses import StreamingResponse
 
-from app.api.dependencies import get_export_service
+from app.api.dependencies import (
+    get_export_service,
+    get_harmonization_export_service,
+)
 from app.core.security import require_api_key
+from app.schemas.activity import ActivityFilters
 from app.schemas.common import FireFilters
+from app.schemas.validation import ValidationFilters
 from app.services.export_service import ExportService
+from app.services.harmonization_export_service import HarmonizationExportService
 
 router = APIRouter(
     prefix="/exports",
@@ -49,6 +55,72 @@ async def export_fires(
         media_type="text/csv",
         headers={
             "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+@router.get(
+    "/harmonization",
+    summary="Export corrected harmonized activity as CSV",
+    response_class=StreamingResponse,
+    responses={
+        200: {
+            "content": {"text/csv": {}},
+            "description": "Streamed CSV export of filtered harmonized activity.",
+        },
+        404: {"description": "The requested integer region primary key was not found."},
+    },
+)
+async def export_harmonization(
+    filters: Annotated[ActivityFilters, Query()],
+    service: Annotated[
+        HarmonizationExportService, Depends(get_harmonization_export_service)
+    ],
+) -> StreamingResponse:
+    stream = await service.prepare_activity_export(filters)
+    timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
+    return StreamingResponse(
+        stream,
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="firelens_harmonization_{timestamp}.csv"'
+            ),
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+@router.get(
+    "/validation",
+    summary="Export validation reports as CSV",
+    response_class=StreamingResponse,
+    responses={
+        200: {
+            "content": {"text/csv": {}},
+            "description": "Streamed CSV export of filtered validation reports.",
+        },
+        404: {"description": "The requested integer region primary key was not found."},
+    },
+)
+async def export_validation(
+    filters: Annotated[ValidationFilters, Query()],
+    service: Annotated[
+        HarmonizationExportService, Depends(get_harmonization_export_service)
+    ],
+) -> StreamingResponse:
+    stream = await service.prepare_validation_export(filters)
+    timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
+    return StreamingResponse(
+        stream,
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="firelens_validation_{timestamp}.csv"'
+            ),
             "Cache-Control": "no-store",
             "X-Content-Type-Options": "nosniff",
         },

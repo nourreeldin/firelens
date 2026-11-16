@@ -8,7 +8,7 @@ from app.schemas.common import ConfidenceLevel, FireFilters
 
 
 class FireRecord(BaseModel):
-    """One harmonized fire detection returned by the read-only API."""
+    """One standardized raw satellite detection returned by the API."""
 
     id: int
     latitude: float = Field(ge=-90, le=90)
@@ -37,6 +37,29 @@ class FireRecord(BaseModel):
     country_name: str | None = None
     continent: str | None = None
     spatial_grid_id: str | None = None
+    source_detection_id: str | None = Field(
+        default=None,
+        description=(
+            "Text identifier referenced by fire_event_members.detection_id and "
+            "fire_overlap_pairs.detection_id_a/detection_id_b; distinct from id."
+        ),
+    )
+    coordinate_reference_system: str | None = None
+    bright_t31: float | None = None
+    bright_ti4: float | None = None
+    bright_ti5: float | None = None
+    source_file: str | None = None
+    instrument: str | None = None
+    fire_type: int | None = None
+    hour: int | None = None
+    minute: int | None = None
+    year: int | None = None
+    month: int | None = None
+    day: int | None = None
+    day_of_year: int | None = None
+    grid_lat: int | None = None
+    grid_lon: int | None = None
+    created_at: datetime | None = None
 
 
 class Pagination(BaseModel):

@@ -1,0 +1,955 @@
+{
+  "started_at_utc": "2026-11-15T21:18:27.232352+00:00",
+  "api_repeats": 9,
+  "warmups_per_version": 2,
+  "plan_repeats": 3,
+  "endpoint": "/api/v1/fires?limit=100&offset=0",
+  "api_transport": "real loopback HTTP, reused connection, actual API handlers, remote configured database",
+  "cases": {
+    "egypt_narrow": {
+      "filters": {
+        "start_date": "2020-01-01",
+        "end_date": "2020-12-31",
+        "region_id": "EGY",
+        "sensor": "VIIRS",
+        "min_latitude": 29.8,
+        "max_latitude": 30.8,
+        "min_longitude": 30.8,
+        "max_longitude": 31.8
+      },
+      "equality": {
+        "before_count": 1052,
+        "after_count": 1052,
+        "before_only": 0,
+        "after_only": 0,
+        "missing_geom_matches": 0
+      },
+      "plans": {
+        "before": {
+          "count": [
+            {
+              "execution_ms": 218.101,
+              "planning_ms": 0.216,
+              "indexes": [
+                "idx_fire_hotspots_country_date"
+              ],
+              "nodes": [
+                "Aggregate",
+                "Bitmap Heap Scan",
+                "Bitmap Index Scan",
+                "Gather"
+              ],
+              "shared_hit_blocks": 553,
+              "shared_read_blocks": 0,
+              "temp_read_blocks": 0,
+              "temp_written_blocks": 0
+            },
+            {
+              "execution_ms": 53.589,
+              "planning_ms": 0.247,
+              "indexes": [
+                "idx_fire_hotspots_country_date"
+              ],
+              "nodes": [
+                "Aggregate",
+                "Bitmap Heap Scan",
+                "Bitmap Index Scan",
+                "Gather"
+              ],
+              "shared_hit_blocks": 553,
+              "shared_read_blocks": 0,
+              "temp_read_blocks": 0,
+              "temp_written_blocks": 0
+            },
+            {
+              "execution_ms": 54.786,
+              "planning_ms": 0.252,
+              "indexes": [
+                "idx_fire_hotspots_country_date"
+              ],
+              "nodes": [
+                "Aggregate",
+                "Bitmap Heap Scan",
+                "Bitmap Index Scan",
+                "Gather"
+              ],
+              "shared_hit_blocks": 553,
+              "shared_read_blocks": 0,
+              "temp_read_blocks": 0,
+              "temp_written_blocks": 0
+            }
+          ],
+          "page": [
+            {
+              "execution_ms": 58.846,
+              "planning_ms": 0.414,
+              "indexes": [
+                "idx_fire_hotspots_country_date"
+              ],
+              "nodes": [
+                "Bitmap Heap Scan",
+                "Bitmap Index Scan",
+                "Gather",
+                "Limit",
+                "Sort"
+              ],
+              "shared_hit_blocks": 553,
+              "shared_read_blocks": 0,
+              "temp_read_blocks": 0,
+              "temp_written_blocks": 0
+            },
+            {
+              "execution_ms": 54.491,
+              "planning_ms": 0.267,
+              "indexes": [
+                "idx_fire_hotspots_country_date"
+              ],
+              "nodes": [
+                "Bitmap Heap Scan",
+                "Bitmap Index Scan",
+                "Gather",
+                "Limit",
+                "Sort"
+              ],
+              "shared_hit_blocks": 553,
+              "shared_read_blocks": 0,
+              "temp_read_blocks": 0,
+              "temp_written_blocks": 0
+            },
+            {
+              "execution_ms": 58.072,
+              "planning_ms": 0.3,
+              "indexes": [
+                "idx_fire_hotspots_country_date"
+              ],
+              "nodes": [
+                "Bitmap Heap Scan",
+                "Bitmap Index Scan",
+                "Gather",
+                "Limit",
+                "Sort"
+              ],
+              "shared_hit_blocks": 553,
+              "shared_read_blocks": 0,
+              "temp_read_blocks": 0,
+              "temp_written_blocks": 0
+            }
+          ]
+        },
+        "after": {
+          "count": [
+            {
+              "execution_ms": 14.409,
+              "planning_ms": 0.342,
+              "indexes": [
+                "idx_fire_hotspots_country_date",
+                "idx_fire_hotspots_geom"
+              ],
+              "nodes": [
+                "Aggregate",
+                "Bitmap Heap Scan",
+                "Bitmap Index Scan",
+                "BitmapAnd",
+                "BitmapOr"
+              ],
+              "shared_hit_blocks": 3814,
+              "shared_read_blocks": 0,
+              "temp_read_blocks": 0,
+              "temp_written_blocks": 0
+            },
+            {
+              "execution_ms": 14.177,
+              "planning_ms": 0.293,
+              "indexes": [
+                "idx_fire_hotspots_country_date",
+                "idx_fire_hotspots_geom"
+              ],
+              "nodes": [
+                "Aggregate",
+                "Bitmap Heap Scan",
+                "Bitmap Index Scan",
+                "BitmapAnd",
+                "BitmapOr"
+              ],
+              "shared_hit_blocks": 3814,
+              "shared_read_blocks": 0,
+              "temp_read_blocks": 0,
+              "temp_written_blocks": 0
+            },
+            {
+              "execution_ms": 14.169,
+              "planning_ms": 0.346,
+              "indexes": [
+                "idx_fire_hotspots_country_date",
+                "idx_fire_hotspots_geom"
+              ],
+              "nodes": [
+                "Aggregate",
+                "Bitmap Heap Scan",
+                "Bitmap Index Scan",
+                "BitmapAnd",
+                "BitmapOr"
+              ],
+              "shared_hit_blocks": 3814,
+              "shared_read_blocks": 0,
+              "temp_read_blocks": 0,
+              "temp_written_blocks": 0
+            }
+          ],
+          "page": [
+            {
+              "execution_ms": 15.559,
+              "planning_ms": 0.346,
+              "indexes": [
+                "idx_fire_hotspots_country_date",
+                "idx_fire_hotspots_geom"
+              ],
+              "nodes": [
+                "Bitmap Heap Scan",
+                "Bitmap Index Scan",
+                "BitmapAnd",
+                "BitmapOr",
+                "Limit",
+                "Sort"
+              ],
+              "shared_hit_blocks": 3814,
+              "shared_read_blocks": 0,
+              "temp_read_blocks": 0,
+              "temp_written_blocks": 0
+            },
+            {
+              "execution_ms": 15.539,
+              "planning_ms": 0.363,
+              "indexes": [
+                "idx_fire_hotspots_country_date",
+                "idx_fire_hotspots_geom"
+              ],
+              "nodes": [
+                "Bitmap Heap Scan",
+                "Bitmap Index Scan",
+                "BitmapAnd",
+                "BitmapOr",
+                "Limit",
+                "Sort"
+              ],
+              "shared_hit_blocks": 3814,
+              "shared_read_blocks": 0,
+              "temp_read_blocks": 0,
+              "temp_written_blocks": 0
+            },
+            {
+              "execution_ms": 15.687,
+              "planning_ms": 0.363,
+              "indexes": [
+                "idx_fire_hotspots_country_date",
+                "idx_fire_hotspots_geom"
+              ],
+              "nodes": [
+                "Bitmap Heap Scan",
+                "Bitmap Index Scan",
+                "BitmapAnd",
+                "BitmapOr",
+                "Limit",
+                "Sort"
+              ],
+              "shared_hit_blocks": 3814,
+              "shared_read_blocks": 0,
+              "temp_read_blocks": 0,
+              "temp_written_blocks": 0
+            }
+          ]
+        }
+      }
+    },
+    "south_africa_narrow": {
+      "filters": {
+        "start_date": "2020-01-01",
+        "end_date": "2020-12-31",
+        "region_id": "ZAF",
+        "sensor": "VIIRS",
+        "min_latitude": -29.0,
+        "max_latitude": -28.0,
+        "min_longitude": 28.0,
+        "max_longitude": 29.0
+      },
+      "equality": {
+        "before_count": 1784,
+        "after_count": 1784,
+        "before_only": 0,
+        "after_only": 0,
+        "missing_geom_matches": 0
+      },
+      "plans": {
+        "before": {
+          "count": [
+            {
+              "execution_ms": 615.025,
+              "planning_ms": 6.577,
+              "indexes": [
+                "idx_fire_hotspots_sensor_date"
+              ],
+              "nodes": [
+                "Aggregate",
+                "Gather",
+                "Index Scan"
+              ],
+              "shared_hit_blocks": 9363,
+              "shared_read_blocks": 0,
+              "temp_read_blocks": 0,
+              "temp_written_blocks": 0
+            },
+            {
+              "execution_ms": 574.315,
+              "planning_ms": 0.988,
+              "indexes": [
+                "idx_fire_hotspots_sensor_date"
+              ],
+              "nodes": [
+                "Aggregate",
+                "Gather",
+                "Index Scan"
+              ],
+              "shared_hit_blocks": 9379,
+              "shared_read_blocks": 0,
+              "temp_read_blocks": 0,
+              "temp_written_blocks": 0
+            },
+            {
+              "execution_ms": 143.824,
+              "planning_ms": 0.928,
+              "indexes": [
+                "idx_fire_hotspots_sensor_date"
+              ],
+              "nodes": [
+                "Aggregate",
+                "Gather",
+                "Index Scan"
+              ],
+              "shared_hit_blocks": 9379,
+              "shared_read_blocks": 0,
+              "temp_read_blocks": 0,
+              "temp_written_blocks": 0
+            }
+          ],
+          "page": [
+            {
+              "execution_ms": 328.188,
+              "planning_ms": 1.208,
+              "indexes": [
+                "idx_fire_hotspots_sensor_date"
+              ],
+              "nodes": [
+                "Gather Merge",
+                "Index Scan",
+                "Limit",
+                "Sort"
+              ],
+              "shared_hit_blocks": 9399,
+              "shared_read_blocks": 0,
+              "temp_read_blocks": 0,
+              "temp_written_blocks": 0
+            },
+            {
+              "execution_ms": 324.257,
+              "planning_ms": 13.536,
+              "indexes": [
+                "idx_fire_hotspots_sensor_date"
+              ],
+              "nodes": [
+                "Gather Merge",
+                "Index Scan",
+                "Limit",
+                "Sort"
+              ],
+              "shared_hit_blocks": 9378,
+              "shared_read_blocks": 0,
+              "temp_read_blocks": 0,
+              "temp_written_blocks": 0
+            },
+            {
+              "execution_ms": 135.066,
+              "planning_ms": 0.266,
+              "indexes": [
+                "idx_fire_hotspots_sensor_date"
+              ],
+              "nodes": [
+                "Gather Merge",
+                "Index Scan",
+                "Limit",
+                "Sort"
+              ],
+              "shared_hit_blocks": 9403,
+              "shared_read_blocks": 0,
+              "temp_read_blocks": 0,
+              "temp_written_blocks": 0
+            }
+          ]
+        },
+        "after": {
+          "count": [
+            {
+              "execution_ms": 390.97,
+              "planning_ms": 3.248,
+              "indexes": [
+                "idx_fire_hotspots_geom",
+                "idx_fire_hotspots_sensor_date"
+              ],
+              "nodes": [
+                "Aggregate",
+                "Bitmap Heap Scan",
+                "Bitmap Index Scan",
+                "BitmapAnd",
+                "BitmapOr",
+                "Gather"
+              ],
+              "shared_hit_blocks": 4079,
+              "shared_read_blocks": 0,
+              "temp_read_blocks": 0,
+              "temp_written_blocks": 0
+            },
+            {
+              "execution_ms": 58.785,
+              "planning_ms": 0.312,
+              "indexes": [
+                "idx_fire_hotspots_geom",
+                "idx_fire_hotspots_sensor_date"
+              ],
+              "nodes": [
+                "Aggregate",
+                "Bitmap Heap Scan",
+                "Bitmap Index Scan",
+                "BitmapAnd",
+                "BitmapOr",
+                "Gather"
+              ],
+              "shared_hit_blocks": 4079,
+              "shared_read_blocks": 0,
+              "temp_read_blocks": 0,
+              "temp_written_blocks": 0
+            },
+            {
+              "execution_ms": 232.862,
+              "planning_ms": 1.645,
+              "indexes": [
+                "idx_fire_hotspots_geom",
+                "idx_fire_hotspots_sensor_date"
+              ],
+              "nodes": [
+                "Aggregate",
+                "Bitmap Heap Scan",
+                "Bitmap Index Scan",
+                "BitmapAnd",
+                "BitmapOr",
+                "Gather"
+              ],
+              "shared_hit_blocks": 4079,
+              "shared_read_blocks": 0,
+              "temp_read_blocks": 0,
+              "temp_written_blocks": 0
+            }
+          ],
+          "page": [
+            {
+              "execution_ms": 95.69,
+              "planning_ms": 1.607,
+              "indexes": [
+                "idx_fire_hotspots_geom",
+                "idx_fire_hotspots_sensor_date"
+              ],
+              "nodes": [
+                "Bitmap Heap Scan",
+                "Bitmap Index Scan",
+                "BitmapAnd",
+                "BitmapOr",
+                "Gather Merge",
+                "Limit",
+                "Sort"
+              ],
+              "shared_hit_blocks": 4094,
+              "shared_read_blocks": 0,
+              "temp_read_blocks": 0,
+              "temp_written_blocks": 0
+            },
+            {
+              "execution_ms": 157.334,
+              "planning_ms": 0.384,
+              "indexes": [
+                "idx_fire_hotspots_geom",
+                "idx_fire_hotspots_sensor_date"
+              ],
+              "nodes": [
+                "Bitmap Heap Scan",
+                "Bitmap Index Scan",
+                "BitmapAnd",
+                "BitmapOr",
+                "Gather Merge",
+                "Limit",
+                "Sort"
+              ],
+              "shared_hit_blocks": 4094,
+              "shared_read_blocks": 0,
+              "temp_read_blocks": 0,
+              "temp_written_blocks": 0
+            },
+            {
+              "execution_ms": 116.226,
+              "planning_ms": 0.377,
+              "indexes": [
+                "idx_fire_hotspots_geom",
+                "idx_fire_hotspots_sensor_date"
+              ],
+              "nodes": [
+                "Bitmap Heap Scan",
+                "Bitmap Index Scan",
+                "BitmapAnd",
+                "BitmapOr",
+                "Gather Merge",
+                "Limit",
+                "Sort"
+              ],
+              "shared_hit_blocks": 4094,
+              "shared_read_blocks": 0,
+              "temp_read_blocks": 0,
+              "temp_written_blocks": 0
+            }
+          ]
+        }
+      }
+    },
+    "south_africa_wide_both_sensors": {
+      "filters": {
+        "start_date": "2020-01-01",
+        "end_date": "2020-12-31",
+        "region_id": "ZAF",
+        "min_latitude": -35.0,
+        "max_latitude": -22.0,
+        "min_longitude": 16.0,
+        "max_longitude": 33.0
+      },
+      "equality": {
+        "before_count": 173662,
+        "after_count": 173662,
+        "before_only": 0,
+        "after_only": 0,
+        "missing_geom_matches": 0
+      },
+      "plans": {
+        "before": {
+          "count": [
+            {
+              "execution_ms": 539.584,
+              "planning_ms": 19.572,
+              "indexes": [
+                "idx_fire_hotspots_country_date"
+              ],
+              "nodes": [
+                "Aggregate",
+                "Gather",
+                "Index Scan"
+              ],
+              "shared_hit_blocks": 7972,
+              "shared_read_blocks": 0,
+              "temp_read_blocks": 0,
+              "temp_written_blocks": 0
+            },
+            {
+              "execution_ms": 199.022,
+              "planning_ms": 0.216,
+              "indexes": [
+                "idx_fire_hotspots_country_date"
+              ],
+              "nodes": [
+                "Aggregate",
+                "Gather",
+                "Index Scan"
+              ],
+              "shared_hit_blocks": 8082,
+              "shared_read_blocks": 0,
+              "temp_read_blocks": 0,
+              "temp_written_blocks": 0
+            },
+            {
+              "execution_ms": 196.652,
+              "planning_ms": 0.226,
+              "indexes": [
+                "idx_fire_hotspots_country_date"
+              ],
+              "nodes": [
+                "Aggregate",
+                "Gather",
+                "Index Scan"
+              ],
+              "shared_hit_blocks": 8079,
+              "shared_read_blocks": 0,
+              "temp_read_blocks": 0,
+              "temp_written_blocks": 0
+            }
+          ],
+          "page": [
+            {
+              "execution_ms": 413.865,
+              "planning_ms": 0.498,
+              "indexes": [
+                "idx_fire_hotspots_country_date"
+              ],
+              "nodes": [
+                "Gather Merge",
+                "Index Scan",
+                "Limit",
+                "Sort"
+              ],
+              "shared_hit_blocks": 8107,
+              "shared_read_blocks": 0,
+              "temp_read_blocks": 0,
+              "temp_written_blocks": 0
+            },
+            {
+              "execution_ms": 393.181,
+              "planning_ms": 0.258,
+              "indexes": [
+                "idx_fire_hotspots_country_date"
+              ],
+              "nodes": [
+                "Gather Merge",
+                "Index Scan",
+                "Limit",
+                "Sort"
+              ],
+              "shared_hit_blocks": 8120,
+              "shared_read_blocks": 0,
+              "temp_read_blocks": 0,
+              "temp_written_blocks": 0
+            },
+            {
+              "execution_ms": 393.607,
+              "planning_ms": 0.301,
+              "indexes": [
+                "idx_fire_hotspots_country_date"
+              ],
+              "nodes": [
+                "Gather Merge",
+                "Index Scan",
+                "Limit",
+                "Sort"
+              ],
+              "shared_hit_blocks": 8122,
+              "shared_read_blocks": 0,
+              "temp_read_blocks": 0,
+              "temp_written_blocks": 0
+            }
+          ]
+        },
+        "after": {
+          "count": [
+            {
+              "execution_ms": 319.801,
+              "planning_ms": 1.738,
+              "indexes": [
+                "idx_fire_hotspots_country_date",
+                "idx_fire_hotspots_geom"
+              ],
+              "nodes": [
+                "Aggregate",
+                "Bitmap Heap Scan",
+                "Bitmap Index Scan",
+                "BitmapAnd",
+                "BitmapOr",
+                "Gather"
+              ],
+              "shared_hit_blocks": 13788,
+              "shared_read_blocks": 0,
+              "temp_read_blocks": 0,
+              "temp_written_blocks": 0
+            },
+            {
+              "execution_ms": 269.713,
+              "planning_ms": 0.356,
+              "indexes": [
+                "idx_fire_hotspots_country_date",
+                "idx_fire_hotspots_geom"
+              ],
+              "nodes": [
+                "Aggregate",
+                "Bitmap Heap Scan",
+                "Bitmap Index Scan",
+                "BitmapAnd",
+                "BitmapOr",
+                "Gather"
+              ],
+              "shared_hit_blocks": 13788,
+              "shared_read_blocks": 0,
+              "temp_read_blocks": 0,
+              "temp_written_blocks": 0
+            },
+            {
+              "execution_ms": 268.136,
+              "planning_ms": 0.401,
+              "indexes": [
+                "idx_fire_hotspots_country_date",
+                "idx_fire_hotspots_geom"
+              ],
+              "nodes": [
+                "Aggregate",
+                "Bitmap Heap Scan",
+                "Bitmap Index Scan",
+                "BitmapAnd",
+                "BitmapOr",
+                "Gather"
+              ],
+              "shared_hit_blocks": 13788,
+              "shared_read_blocks": 0,
+              "temp_read_blocks": 0,
+              "temp_written_blocks": 0
+            }
+          ],
+          "page": [
+            {
+              "execution_ms": 440.338,
+              "planning_ms": 0.415,
+              "indexes": [
+                "idx_fire_hotspots_country_date",
+                "idx_fire_hotspots_geom"
+              ],
+              "nodes": [
+                "Bitmap Heap Scan",
+                "Bitmap Index Scan",
+                "BitmapAnd",
+                "BitmapOr",
+                "Gather Merge",
+                "Limit",
+                "Sort"
+              ],
+              "shared_hit_blocks": 13803,
+              "shared_read_blocks": 0,
+              "temp_read_blocks": 0,
+              "temp_written_blocks": 0
+            },
+            {
+              "execution_ms": 432.822,
+              "planning_ms": 0.484,
+              "indexes": [
+                "idx_fire_hotspots_country_date",
+                "idx_fire_hotspots_geom"
+              ],
+              "nodes": [
+                "Bitmap Heap Scan",
+                "Bitmap Index Scan",
+                "BitmapAnd",
+                "BitmapOr",
+                "Gather Merge",
+                "Limit",
+                "Sort"
+              ],
+              "shared_hit_blocks": 13803,
+              "shared_read_blocks": 0,
+              "temp_read_blocks": 0,
+              "temp_written_blocks": 0
+            },
+            {
+              "execution_ms": 432.296,
+              "planning_ms": 0.441,
+              "indexes": [
+                "idx_fire_hotspots_country_date",
+                "idx_fire_hotspots_geom"
+              ],
+              "nodes": [
+                "Bitmap Heap Scan",
+                "Bitmap Index Scan",
+                "BitmapAnd",
+                "BitmapOr",
+                "Gather Merge",
+                "Limit",
+                "Sort"
+              ],
+              "shared_hit_blocks": 13803,
+              "shared_read_blocks": 0,
+              "temp_read_blocks": 0,
+              "temp_written_blocks": 0
+            }
+          ]
+        }
+      }
+    }
+  },
+  "database": {
+    "postgres_version": "17.11",
+    "plan_cache_mode": "auto",
+    "enable_seqscan": "on",
+    "enable_bitmapscan": "on",
+    "read_only": "off",
+    "rows": 648568,
+    "null_geometries": 0,
+    "spatial_index": "CREATE INDEX idx_fire_hotspots_geom ON public.fire_hotspots USING gist (geom)"
+  },
+  "fallback_fixture": {
+    "matched": true,
+    "rows": {
+      "before": [
+        {
+          "id": 1,
+          "missing_geom": false
+        },
+        {
+          "id": 2,
+          "missing_geom": true
+        },
+        {
+          "id": 3,
+          "missing_geom": true
+        },
+        {
+          "id": 4,
+          "missing_geom": true
+        },
+        {
+          "id": 9,
+          "missing_geom": false
+        }
+      ],
+      "after": [
+        {
+          "id": 1,
+          "missing_geom": false
+        },
+        {
+          "id": 2,
+          "missing_geom": true
+        },
+        {
+          "id": 3,
+          "missing_geom": true
+        },
+        {
+          "id": 4,
+          "missing_geom": true
+        },
+        {
+          "id": 9,
+          "missing_geom": false
+        }
+      ]
+    },
+    "null_geometry_matches": 3,
+    "coverage": "inside/outside, inclusive corners, authoritative non-null geometry, country/date/sensor guards"
+  },
+  "api": {
+    "egypt_narrow": {
+      "before": {
+        "samples_ms": [
+          830.8520996943116,
+          872.2728001885116,
+          722.199400421232,
+          829.8865002579987,
+          819.23389993608,
+          893.5108999721706,
+          886.034999974072,
+          812.0748000219464,
+          832.9588999040425
+        ],
+        "median_ms": 830.8520996943116,
+        "min_ms": 722.199400421232,
+        "max_ms": 893.5108999721706,
+        "p95_ms": 893.5108999721706
+      },
+      "after": {
+        "samples_ms": [
+          893.9465996809304,
+          829.5066002756357,
+          804.6897002495825,
+          849.2367998696864,
+          735.2289999835193,
+          1036.7602999322116,
+          896.0255002602935,
+          712.9478002898395,
+          772.5868001580238
+        ],
+        "median_ms": 829.5066002756357,
+        "min_ms": 712.9478002898395,
+        "max_ms": 1036.7602999322116,
+        "p95_ms": 1036.7602999322116
+      },
+      "responses_identical": true,
+      "page_rows": 100,
+      "total": 1052
+    },
+    "south_africa_narrow": {
+      "before": {
+        "samples_ms": [
+          1130.4619000293314,
+          1091.204599943012,
+          1082.4096002615988,
+          1048.7229996360838,
+          1074.403100181371,
+          1105.2047000266612,
+          1053.457499947399,
+          1051.785500254482,
+          1045.953799970448
+        ],
+        "median_ms": 1074.403100181371,
+        "min_ms": 1045.953799970448,
+        "max_ms": 1130.4619000293314,
+        "p95_ms": 1130.4619000293314
+      },
+      "after": {
+        "samples_ms": [
+          772.5358000025153,
+          808.6728998459876,
+          746.2534001097083,
+          783.4046999923885,
+          688.708100002259,
+          808.1322000361979,
+          783.7254996411502,
+          780.4402997717261,
+          762.7133997157216
+        ],
+        "median_ms": 780.4402997717261,
+        "min_ms": 688.708100002259,
+        "max_ms": 808.6728998459876,
+        "p95_ms": 808.6728998459876
+      },
+      "responses_identical": true,
+      "page_rows": 100,
+      "total": 1784
+    },
+    "south_africa_wide_both_sensors": {
+      "before": {
+        "samples_ms": [
+          1551.427900325507,
+          1519.8452998884022,
+          1539.6627997979522,
+          1674.1834003478289,
+          1636.0023999586701,
+          1607.516000047326,
+          1626.4231000095606,
+          1688.762899953872,
+          1683.8217000477016
+        ],
+        "median_ms": 1626.4231000095606,
+        "min_ms": 1519.8452998884022,
+        "max_ms": 1688.762899953872,
+        "p95_ms": 1688.762899953872
+      },
+      "after": {
+        "samples_ms": [
+          1590.3503000736237,
+          1654.5390002429485,
+          1667.2379998490214,
+          1947.6510998792946,
+          1907.9097001813352,
+          1916.0838001407683,
+          1891.5188000537455,
+          1840.8157997764647,
+          1903.7192999385297
+        ],
+        "median_ms": 1891.5188000537455,
+        "min_ms": 1590.3503000736237,
+        "max_ms": 1947.6510998792946,
+        "p95_ms": 1947.6510998792946
+      },
+      "responses_identical": true,
+      "page_rows": 100,
+      "total": 173662
+    }
+  },
+  "finished_at_utc": "2026-11-15T21:20:16.415985+00:00"
+}

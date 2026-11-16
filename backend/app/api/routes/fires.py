@@ -16,7 +16,7 @@ router = APIRouter(prefix="/fires", tags=["fires"])
     response_model=FireListResponse,
     summary="List fire detections",
     description=(
-        "Return harmonized fire detections from public.fire_hotspots with "
+        "Return standardized raw satellite detections from public.fire_hotspots with "
         "date, country, sensor, bounding-box, and pagination filters. The "
         "bounding box is evaluated with PostGIS ST_Intersects and "
         "ST_MakeEnvelope."

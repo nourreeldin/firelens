@@ -4,6 +4,8 @@ from app.repositories.region_repository import RegionRepository
 from app.schemas.region import (
     BoundingBox,
     Centroid,
+    RegionCatalogRecord,
+    RegionCatalogResponse,
     RegionListResponse,
     RegionRecord,
 )
@@ -68,3 +70,8 @@ class RegionService:
             )
 
         return RegionListResponse(data=records, total=len(records))
+
+    async def list_catalog(self) -> RegionCatalogResponse:
+        rows = await self.repository.list_catalog()
+        records = [RegionCatalogRecord(**row) for row in rows]
+        return RegionCatalogResponse(data=records, total=len(records))

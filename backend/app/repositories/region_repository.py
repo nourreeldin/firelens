@@ -35,6 +35,34 @@ class RegionRepository:
         rows = await self.database.fetch(REGION_AGGREGATE_SQL)
         return [dict(row) for row in rows]
 
+    async def list_catalog(self) -> list[dict[str, Any]]:
+        """Return explicitly configured regions and their stable integer IDs."""
+        rows = await self.database.fetch(
+            """
+            SELECT
+                id,
+                name,
+                slug,
+                country_code,
+                description,
+                min_latitude,
+                min_longitude,
+                max_latitude,
+                max_longitude,
+                created_at
+            FROM public.regions
+            ORDER BY name, id
+            """
+        )
+        return [dict(row) for row in rows]
+
+    async def exists_by_id(self, region_pk: int) -> bool:
+        value = await self.database.fetchval(
+            "SELECT EXISTS (SELECT 1 FROM public.regions WHERE id = $1)",
+            region_pk,
+        )
+        return bool(value)
+
     async def exists(self, country_code: str) -> bool:
         """Validate a three-letter country code against available records."""
         value = await self.database.fetchval(

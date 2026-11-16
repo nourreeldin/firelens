@@ -1,5 +1,6 @@
 """Pydantic schemas for dynamically derived regions."""
 
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -42,4 +43,24 @@ class RegionListResponse(BaseModel):
     """All regions currently represented in the canonical dataset."""
 
     data: list[RegionRecord]
+    total: int = Field(ge=0)
+
+
+class RegionCatalogRecord(BaseModel):
+    """Persisted region row used by harmonized and validation data."""
+
+    id: int = Field(gt=0, description="Integer primary key in public.regions.")
+    name: str
+    slug: str
+    country_code: str | None = Field(default=None, max_length=3)
+    description: str | None = None
+    min_latitude: float | None = Field(default=None, ge=-90, le=90)
+    min_longitude: float | None = Field(default=None, ge=-180, le=180)
+    max_latitude: float | None = Field(default=None, ge=-90, le=90)
+    max_longitude: float | None = Field(default=None, ge=-180, le=180)
+    created_at: datetime | None = None
+
+
+class RegionCatalogResponse(BaseModel):
+    data: list[RegionCatalogRecord]
     total: int = Field(ge=0)

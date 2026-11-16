@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from app.api.dependencies import get_region_service
-from app.schemas.region import RegionListResponse
+from app.schemas.region import RegionCatalogResponse, RegionListResponse
 from app.services.region_service import RegionService
 
 router = APIRouter(prefix="/regions", tags=["regions"])
@@ -25,3 +25,19 @@ async def list_regions(
     service: Annotated[RegionService, Depends(get_region_service)],
 ) -> RegionListResponse:
     return await service.list_regions()
+
+
+@router.get(
+    "/catalog",
+    response_model=RegionCatalogResponse,
+    summary="List configured integer-ID regions",
+    description=(
+        "Return persisted rows from public.regions. The integer ids are used "
+        "by harmonized activity and validation records. The existing /regions "
+        "endpoint remains the derived country list used by raw fire filters."
+    ),
+)
+async def list_region_catalog(
+    service: Annotated[RegionService, Depends(get_region_service)],
+) -> RegionCatalogResponse:
+    return await service.list_catalog()

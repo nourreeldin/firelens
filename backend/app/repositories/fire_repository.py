@@ -29,7 +29,24 @@ FIRE_SELECT_COLUMNS = """
     country_code,
     country_name,
     continent,
-    spatial_grid_id
+    spatial_grid_id,
+    source_detection_id,
+    coordinate_reference_system,
+    bright_t31,
+    bright_ti4,
+    bright_ti5,
+    source_file,
+    instrument,
+    fire_type,
+    hour,
+    minute,
+    year,
+    month,
+    day,
+    day_of_year,
+    grid_lat,
+    grid_lon,
+    created_at
 """
 
 
