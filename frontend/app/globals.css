@@ -135,6 +135,24 @@ body {
   transition: background .2s, color .2s;
 }
 button, input, select { font: inherit; }
+
+/* Fade the entire palette together only while the user switches themes. */
+html[data-theme-transition] { --fl-theme-duration: 360ms; }
+html[data-theme-transition],
+html[data-theme-transition] *,
+html[data-theme-transition] *::before,
+html[data-theme-transition] *::after {
+  transition: background-color var(--fl-theme-duration) ease-in-out,
+    color var(--fl-theme-duration) ease-in-out,
+    border-color var(--fl-theme-duration) ease-in-out,
+    box-shadow var(--fl-theme-duration) ease-in-out,
+    fill var(--fl-theme-duration) ease-in-out,
+    stroke var(--fl-theme-duration) ease-in-out !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-theme-transition] { --fl-theme-duration: 0ms; }
+}
+
 [hidden] { display: none !important; }
 button, a, select, input { outline-offset: 3px; }
 button:focus-visible, a:focus-visible,

@@ -17,6 +17,7 @@ import HarmonizationWorkspace from "./harmonization-workspace";
 import FireDetails from "./fire-details";
 import WorkspaceSidebar, { workspaceIcons } from "./workspace-sidebar";
 import { workspaceViews, workspaceViewFromHash, type WorkspaceView } from "@/lib/workspace-navigation";
+import { transitionTheme } from "@/lib/theme-transition";
 import type {
   CalendarDay, Filters,
 } from "@/lib/api/types";
@@ -184,8 +185,7 @@ export default function Dashboard() {
   function toggleDark() {
     const next = !dark;
     setDark(next);
-    document.documentElement.classList.toggle("dark", next);
-    localStorage.setItem("firelens-dark", next ? "1" : "0");
+    transitionTheme(next);
   }
 
   /* queries */

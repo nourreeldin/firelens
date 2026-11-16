@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, type MouseEvent } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { Activity, ArrowLeft, ChartNoAxesCombined, ChevronRight, Flame, Layers, LayoutDashboard, MapPinned, ShieldCheck, TableProperties, X, type LucideIcon } from "lucide-react";
 import { workspaceViews, type WorkspaceView } from "@/lib/workspace-navigation";
 
@@ -13,6 +13,10 @@ export default function WorkspaceSidebar({ activeView, open, onNavigate, onClose
   activeView: WorkspaceView; open: boolean; onNavigate: (view: WorkspaceView) => void; onClose: () => void;
 }) {
   const sidebar = useRef<HTMLElement>(null);
+  const [homeLinkReady, setHomeLinkReady] = useState(false);
+  // Keep the server and first client footer identical. Add this navigation
+  // enhancement only after hydration, including during development refreshes.
+  useEffect(() => setHomeLinkReady(true), []);
   useEffect(() => {
     if (!open) return;
     const previous = document.activeElement;
@@ -64,7 +68,7 @@ export default function WorkspaceSidebar({ activeView, open, onNavigate, onClose
           })}
         </div>)}
       </nav>
-      <div className="sidebar-footer"><a href="/" className="sidebar-home-link"><ArrowLeft size={13} /> Back to home</a><span className="sidebar-satellite"><ShieldCheck size={16} /> SATELLITE OBSERVATIONS</span><p>NASA Space Apps<br /><strong>Cairo · 2026</strong></p></div>
+      <div className="sidebar-footer">{homeLinkReady && <a href="/" className="sidebar-home-link"><ArrowLeft size={13} /> Back to home</a>}<span className="sidebar-satellite"><ShieldCheck size={16} /> SATELLITE OBSERVATIONS</span><p>NASA Space Apps<br /><strong>Cairo · 2026</strong></p></div>
     </aside>
   </>;
 }
