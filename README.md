@@ -2,74 +2,125 @@
 
 **One view of fire activity. Powered by NASA satellite data.**
 
-FireLens is a geospatial web platform developed by **Team Supernova-X** for **NASA Space Apps Cairo 2026**. It brings together active-fire detections from NASA's **MODIS** and **VIIRS** instruments to help users explore fire activity across locations and time through a unified, interactive dashboard.
+FireLens is a geospatial platform for exploring active-fire observations from NASA's MODIS and VIIRS instruments. It combines a Python data-processing pipeline, a FastAPI backend for querying fire and harmonized-activity datasets, and a Next.js dashboard for map, calendar, analytics, and validation workflows.
 
-> **Project status:** Hackathon prototype. Features and deployment details will be updated as development progresses.
+> **Project status:** Prototype developed for NASA Space Apps Cairo 2026. Functionality, data coverage, and deployment details depend on the configured dataset and environment.
 
-## The challenge
+## Repository structure
 
-MODIS and VIIRS provide valuable observations of active fires, but their records differ in spatial resolution, observation characteristics, and coverage periods. Simply concatenating their detections can produce misleading trends and duplicate observations.
-
-FireLens aims to make these complementary datasets easier to compare and explore while preserving their provenance and differences.
-
-## Our solution
-
-FireLens is designed to:
-
-- **Ingest** NASA FIRMS active-fire records from MODIS and VIIRS.
-- **Harmonize** source fields, timestamps, coordinates, and confidence information into a consistent data model, retaining sensor-specific metadata.
-- **Explore** detections on an interactive map with geographic and temporal filters.
-- **Analyze** fire activity through timelines, summaries, and visualizations.
-- **Support decisions** by making satellite fire observations more accessible and interpretable.
-
-**Important:** Satellite active-fire detections are observations, not confirmed wildfire boundaries or burned-area estimates. Sensor differences, overpass frequency, clouds, and detection limitations must be considered when interpreting trends. FireLens is not a replacement for operational emergency warning systems.
-
-## Architecture
-
-```mermaid
-flowchart LR
-    A[NASA FIRMS<br/>MODIS + VIIRS] --> B[Data Ingestion]
-    B --> C[Harmonization Engine]
-    C --> D[(PostgreSQL + PostGIS)]
-    D --> E[FastAPI Backend]
-    E --> F[Next.js Dashboard]
-    F --> G[Interactive Map + Analytics]
+```text
+.
+├── frontend/   # Next.js dashboard and landing page
+├── backend/    # FastAPI read-only API (PostgreSQL + PostGIS)
+├── engine/     # Python scripts for harmonization, matching, and validation
+├── DESIGN.md   # UI/design reference notes
+└── README.md
 ```
 
-The harmonization pipeline standardizes the records while retaining their original sensor identity and relevant quality indicators. The API serves geospatial and temporal queries to the dashboard.
+## What’s in this repository
 
-## Tech stack
+### Frontend (`frontend/`)
 
-| Layer | Technologies |
-| --- | --- |
-| Frontend | Next.js, React, TypeScript, Tailwind CSS |
-| UI | shadcn/ui, Radix UI |
-| Maps | React Leaflet |
-| Charts | Recharts |
-| Data fetching | TanStack Query |
-| Backend | Python, FastAPI |
-| Database | PostgreSQL, PostGIS |
-| Data sources | NASA FIRMS (MODIS and VIIRS) |
+A Next.js (App Router) application that provides:
 
-## NASA data sources
+- A landing page with project context and entry points to the dashboard.
+- Dashboard workspaces for overview, fire activity, map, detection records, historical analytics, harmonization, and validation views.
+- Client data fetching with TanStack Query and visualization with React Leaflet and Recharts.
+- Browser-to-backend proxy routes for JSON and CSV export requests, so the frontend can talk to the FireLens API without depending on backend CORS for browser fetches.
 
-- [NASA FIRMS](https://firms.modaps.eosdis.nasa.gov/) — Fire Information for Resource Management System.
-- [FIRMS API documentation](https://firms.modaps.eosdis.nasa.gov/api/) — access to active-fire data.
-- [NASA Earthdata](https://www.earthdata.nasa.gov/) — background on NASA Earth-observation data.
+See [`frontend/README.md`](frontend/README.md) for local development, environment variables, map tile configuration, and frontend-specific behavior.
 
-Please follow the applicable NASA data-use guidance and include appropriate dataset attribution in outputs.
+### Backend (`backend/`)
 
-## Planned workflow
+A read-only FastAPI service (v1 under `/api/v1`) backed by PostgreSQL/PostGIS via asyncpg. It exposes:
 
-1. Select an area of interest and time range.
-2. Retrieve or query available MODIS and VIIRS detections.
-3. Standardize records and preserve source-specific attributes.
-4. Query the unified dataset through the backend API.
-5. Inspect detections and trends in the FireLens dashboard.
+- Raw fire detections, regions, calendar, seasonal/comparison/anomaly analytics, and CSV exports.
+- Harmonized activity records and analytics (separate from raw detection counts).
+- Validation reports and exports.
+- Health checks and OpenAPI/Swagger documentation (`/docs`, `/redoc`).
+
+The backend uses parameterized SQL, does not create or alter database objects at startup, and requires an existing `DATABASE_URL` pointing to a compatible database.
+
+See [`backend/README.md`](backend/README.md) and [`backend/API.md`](backend/API.md) for setup, routes, data model notes, and API details.
+
+### Engine (`engine/`)
+
+Python scripts for preparing and validating fire-detection datasets, including:
+
+- Harmonization of MODIS/VIIRS inputs.
+- Validation of harmonized records.
+- Spatial-temporal overlap/matching between sensors.
+- Match validation and fire-event grouping utilities.
+
+The engine expects raw/processed data in `engine/data/` (ignored by `engine/.gitignore`) and is typically run from the `engine/` directory.
+
+See [`engine/README.md`](engine/README.md) for script order, dependencies, and expected outputs.
 
 ## Getting started
 
-The repository's installation and run commands will be documented once the frontend, backend, and data-pipeline structure is finalized. Configuration values such as database credentials and NASA FIRMS API keys should be provided through environment variables and never committed to Git.
+### Prerequisites
+
+- **Frontend:** Node.js and [pnpm](https://pnpm.io/) (the app declares `pnpm@12.3.4` in `frontend/package.json`).
+- **Backend:** Python 3.12+, access to PostgreSQL 15+ with PostGIS, and a valid `DATABASE_URL`.
+- **Engine:** Python 3.x and dependencies from `engine/requirements.txt`.
+
+### 1. Run the backend
+
+```bash
+cd backend
+python -m venv .venv
+# Activate the virtual environment, then:
+pip install -r requirements.txt
+cp .env.example .env
+# Set DATABASE_URL in .env
+uvicorn app.main:app --reload
+```
+
+Default local URLs:
+- API: `http://127.0.0.1:8000`
+- Docs: `http://127.0.0.1:8000/docs`
+
+### 2. Run the frontend
+
+```bash
+cd frontend
+pnpm install
+cp .env.example .env.local
+# Set NEXT_PUBLIC_API_BASE_URL (and optional vars as needed)
+pnpm dev
+```
+
+Open `http://localhost:3000`. The landing page links to the dashboard at `/dashboard`.
+
+### 3. Run engine scripts (optional/data workflow)
+
+```bash
+cd engine
+pip install -r requirements.txt
+# Place or prepare input data under engine/data/ as expected by the scripts
+python scripts/harmonization.py
+python scripts/validate_harmonized.py
+python scripts/overlap_detection.py
+python scripts/validate_matching.py
+python scripts/fire_event_grouping.py
+```
+
+Script paths, thresholds, and outputs are defined/configured within the engine scripts and documented in [`engine/README.md`](engine/README.md).
+
+## Configuration notes
+
+- Do not commit secrets. Use environment files such as `backend/.env` and `frontend/.env.local`.
+- Frontend browser requests can be proxied through Next.js routes; server-side export proxying can use `FIRELENS_API_BASE_URL` and `FIRELENS_API_KEY` when required by the backend.
+- Backend analytics behavior (date coverage, historical/anomaly availability, method versions) depends on the data loaded in the connected database.
+- Treat satellite detections as observations, not confirmed fire perimeters. Interpretation should account for sensor characteristics, overpass timing, and environmental conditions.
+
+## Data sources & attribution
+
+- [NASA FIRMS](https://firms.modaps.eosdis.nasa.gov/) — Fire Information for Resource Management System (MODIS and VIIRS active-fire data).
+- [FIRMS API documentation](https://firms.modaps.eosdis.nasa.gov/api/)
+- [NASA Earthdata](https://www.earthdata.nasa.gov/)
+
+Follow applicable NASA data-use guidance and include appropriate attribution when presenting derived outputs. FireLens is an independent project and not an official NASA product.
 
 ## Team Supernova-X
 
@@ -82,14 +133,5 @@ The repository's installation and run commands will be documented once the front
 | Mohamed Sherif | Data Scientist |
 | Yara Ibrahim | Data Scientist · Storyteller |
 
-## Event
-
 Built for **NASA Space Apps Challenge 2026 — Cairo Local Event**.
 
-## Acknowledgments
-
-We acknowledge NASA and the FIRMS team for providing access to MODIS and VIIRS active-fire observations. FireLens is an independent hackathon project and is not an official NASA product.
-
-## License
-
-A license has not yet been specified. Add a `LICENSE` file before describing the repository as open-source.
