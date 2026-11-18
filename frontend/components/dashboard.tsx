@@ -18,6 +18,7 @@ import FireDetails from "./fire-details";
 import WorkspaceSidebar, { workspaceIcons } from "./workspace-sidebar";
 import { workspaceViews, workspaceViewFromHash, type WorkspaceView } from "@/lib/workspace-navigation";
 import { transitionTheme } from "@/lib/theme-transition";
+import { dashboardQueries, defaultFilters as initial } from "@/lib/dashboard-queries";
 import type {
   CalendarDay, Filters,
 } from "@/lib/api/types";
@@ -28,7 +29,6 @@ const FireMap = dynamic(() => import("./fire-map"), {
 });
 
 /* ── constants ──────────────────────────────────────────────── */
-const initial: Filters = { region: "", startDate: "", endDate: "", sensor: "ALL" };
 const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 /* ── helpers ────────────────────────────────────────────────── */
@@ -204,10 +204,8 @@ export default function Dashboard() {
   const dateScope = dateAvailabilityScope(scope);
   const availabilityKey = JSON.stringify(dateScope);
   const availability = useQuery({
-    queryKey: ["available-periods", dateScope],
-    queryFn: ({ signal }) => api.availablePeriods(dateScope, signal),
+    ...dashboardQueries.availablePeriods(dateScope),
     enabled: datesOpen && !scopeError,
-    staleTime: 5 * 60_000,
   });
   const observedMonths = useMemo(() => availableMonths(availability.data?.data ?? []), [availability.data]);
   const years = [...new Set(observedMonths.map((row) => row.year))];
@@ -220,7 +218,6 @@ export default function Dashboard() {
     queryKey: ["available-days", monthFilters],
     queryFn: ({ signal }) => api.calendar(monthFilters, signal),
     enabled: datesOpen && !scopeError && !!month,
-    staleTime: 5 * 60_000,
   });
   const days = (availableCalendar.data?.data ?? [])
     .filter((row) => row.fire_count > 0 && row.date.startsWith(`${year}-${month}-`))
@@ -232,9 +229,9 @@ export default function Dashboard() {
   const calendarRangeError = calendarError(filters);
   const historicalRangeError = historyError(filters);
 
-  const healthQuery  = useQuery({ queryKey: ["health"],   queryFn: ({ signal }) => api.health(signal), refetchInterval: 30_000 });
-  const catalog = useQuery({ queryKey: ["region-catalog"], queryFn: ({ signal }) => api.regionCatalog(signal), staleTime: 5 * 60_000 });
-  const regionsQuery = useQuery({ queryKey: ["regions"],  queryFn: ({ signal }) => api.regions(signal) });
+  const healthQuery  = useQuery({ ...dashboardQueries.health(), refetchInterval: 30_000 });
+  const catalog = useQuery(dashboardQueries.catalog());
+  const regionsQuery = useQuery(dashboardQueries.regions());
 
   const regions = useMemo(() => selectableRegions(catalog.data?.data ?? [], regionsQuery.data?.data ?? []), [catalog.data, regionsQuery.data]);
 
@@ -252,11 +249,11 @@ export default function Dashboard() {
     setPage(1); setSelectedDay(null);
   }
 
-  const firesQuery    = useQuery({ queryKey: ["fires", filters, page], queryFn: ({ signal }) => api.fires(filters, page, 100, signal), enabled: validFilters && (activeView === "overview" || activeView === "data") });
-  const calendarQuery = useQuery({ queryKey: ["calendar", filters], queryFn: ({ signal }) => api.calendar(filters, signal), enabled: validFilters && activeView === "activity" && !calendarRangeError && (panels.calendar || panels.trend) });
-  const seasonal      = useQuery({ queryKey: ["seasonal", filters], queryFn: ({ signal }) => api.seasonal(filters, signal), enabled: validFilters && activeView === "activity" && panels.seasonal });
-  const comparison    = useQuery({ queryKey: ["comparison", filters], queryFn: ({ signal }) => api.comparison(filters, signal), enabled: validFilters && activeView === "analytics" && !historicalRangeError && panels.comparison });
-  const anomalies     = useQuery({ queryKey: ["anomalies", filters], queryFn: ({ signal }) => api.anomalies(filters, signal), enabled: validFilters && activeView === "analytics" && !historicalRangeError && panels.anomalies });
+  const firesQuery    = useQuery({ ...dashboardQueries.fires(filters, page), enabled: validFilters && (activeView === "overview" || activeView === "data") });
+  const calendarQuery = useQuery({ ...dashboardQueries.calendar(filters), enabled: validFilters && activeView === "activity" && !calendarRangeError && (panels.calendar || panels.trend) });
+  const seasonal      = useQuery({ ...dashboardQueries.seasonal(filters), enabled: validFilters && activeView === "activity" && panels.seasonal });
+  const comparison    = useQuery({ ...dashboardQueries.comparison(filters), enabled: validFilters && activeView === "analytics" && !historicalRangeError && panels.comparison });
+  const anomalies     = useQuery({ ...dashboardQueries.anomalies(filters), enabled: validFilters && activeView === "analytics" && !historicalRangeError && panels.anomalies });
 
   const fireResult  = { rows: firesQuery.data?.data ?? [], total: firesQuery.data?.pagination.total };
   const calendar    = useMemo(() => calendarQuery.data?.data ?? [], [calendarQuery.data]);

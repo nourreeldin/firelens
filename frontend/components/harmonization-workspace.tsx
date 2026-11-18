@@ -4,12 +4,12 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Activity, Layers, Satellite } from "lucide-react";
-import { ACTIVITY_METHOD, QA_METHOD, activityQuery, api, calendarError, filterError, historyError } from "@/lib/api/client";
+import { activityQuery, calendarError, filterError, historyError } from "@/lib/api/client";
+import { dashboardQueries, defaultProductScope as defaultScope } from "@/lib/dashboard-queries";
 import { activitySeries } from "@/lib/api/activity-series";
 import type { ActivityCalendarDay, ActivityFilters, DateFilters, ValidationFilters } from "@/lib/api/types";
 import { AnalyticsResults, ErrorNote, ExportButton, formatNumber, Pagination, Panel } from "./dashboard-ui";
 
-const defaultScope = { regionPk: "", methodVersion: ACTIVITY_METHOD, validationMethodVersion: QA_METHOD, spatialGridId: "" };
 const seriesColors = ["#b35d27", "#3a7d59", "#617ea4", "#a36d99", "#a18a35", "#548a94"];
 const tooltipStyle = { fontSize: 11, borderRadius: 4, background: "var(--fl-surface)", color: "var(--fl-ink)", border: "1px solid var(--fl-border)" };
 
@@ -70,13 +70,13 @@ export default function HarmonizationWorkspace({ dates, view, enabled: workspace
   const enabled = !selectionError;
   const activityEnabled = enabled && view === "harmonization";
   const validationEnabled = enabled && view === "validation";
-  const catalog = useQuery({ queryKey: ["region-catalog"], queryFn: ({ signal }) => api.regionCatalog(signal) });
-  const records = useQuery({ queryKey: ["activity-records", filters, page], queryFn: ({ signal }) => api.activity(filters, page, 100, signal), enabled: activityEnabled && panels.records });
-  const calendar = useQuery({ queryKey: ["activity-calendar", filters], queryFn: ({ signal }) => api.activityCalendar(filters, signal), enabled: activityEnabled && !rangeError && (panels.calendar || panels.trend) });
-  const seasonal = useQuery({ queryKey: ["activity-seasonal", filters], queryFn: ({ signal }) => api.activitySeasonal(filters, signal), enabled: activityEnabled && panels.seasonal });
-  const comparison = useQuery({ queryKey: ["activity-comparison", filters], queryFn: ({ signal }) => api.activityComparison(filters, signal), enabled: activityEnabled && !historicError && panels.comparison });
-  const anomalies = useQuery({ queryKey: ["activity-anomalies", filters], queryFn: ({ signal }) => api.activityAnomalies(filters, signal), enabled: activityEnabled && !historicError && panels.anomalies });
-  const validation = useQuery({ queryKey: ["validation", validationFilters, validationPage], queryFn: ({ signal }) => api.validation(validationFilters, validationPage, 100, signal), enabled: validationEnabled && panels.validation });
+  const catalog = useQuery(dashboardQueries.catalog());
+  const records = useQuery({ ...dashboardQueries.activity(filters, page), enabled: activityEnabled && panels.records });
+  const calendar = useQuery({ ...dashboardQueries.activityCalendar(filters), enabled: activityEnabled && !rangeError && (panels.calendar || panels.trend) });
+  const seasonal = useQuery({ ...dashboardQueries.activitySeasonal(filters), enabled: activityEnabled && panels.seasonal });
+  const comparison = useQuery({ ...dashboardQueries.activityComparison(filters), enabled: activityEnabled && !historicError && panels.comparison });
+  const anomalies = useQuery({ ...dashboardQueries.activityAnomalies(filters), enabled: activityEnabled && !historicError && panels.anomalies });
+  const validation = useQuery({ ...dashboardQueries.validation(validationFilters, validationPage), enabled: validationEnabled && panels.validation });
   const daily = useMemo(() => calendar.data?.data ?? [], [calendar.data]);
   const chart = useMemo(() => activitySeries(daily), [daily]);
   const selectedDay = daily.find((day) => JSON.stringify([day.date, day.method_version]) === selected);

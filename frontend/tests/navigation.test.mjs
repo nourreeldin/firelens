@@ -4,21 +4,31 @@ import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
-import { act, createElement as h } from "react";
+import { act, createElement as h, StrictMode } from "react";
 import { JSDOM } from "jsdom";
 import ts from "typescript";
 
 const require = createRequire(import.meta.url);
 const project = fileURLToPath(new URL("../", import.meta.url));
 const delay = () => new Promise((done) => setTimeout(done, 20));
+async function waitFor(check) {
+  const deadline = Date.now() + 2000;
+  while (!check() && Date.now() < deadline) await act(delay);
+  assert.ok(check(), "Expected launch state before timeout");
+}
 
-async function mount(hash = "") {
+async function mount(hash = "", { landing = false, apiGate } = {}) {
   const dom = new JSDOM('<!doctype html><html><body><div id="app"></div></body></html>', { url: `http://localhost/${hash}`, pretendToBeVisual: true });
   dom.window.scrollTo = () => {};
-  const globals = { window: dom.window, self: dom.window, document: dom.window.document, HTMLElement: dom.window.HTMLElement, localStorage: dom.window.localStorage, requestAnimationFrame: dom.window.requestAnimationFrame.bind(dom.window), IS_REACT_ACT_ENVIRONMENT: true };
+  dom.window.HTMLDialogElement.prototype.showModal = function () { this.open = true; this.querySelector("button")?.focus(); };
+  dom.window.HTMLDialogElement.prototype.close = function () { this.open = false; };
+  const globals = { window: dom.window, self: dom.window, document: dom.window.document, Element: dom.window.Element, HTMLElement: dom.window.HTMLElement, localStorage: dom.window.localStorage, requestAnimationFrame: dom.window.requestAnimationFrame.bind(dom.window), IS_REACT_ACT_ENVIRONMENT: true };
   const saved = new Map(Object.keys(globals).map((key) => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
   for (const [key, value] of Object.entries(globals)) Object.defineProperty(globalThis, key, { value, configurable: true, writable: true });
   const calls = [];
+  const prefetchedRoutes = [];
+  const pushedRoutes = [];
+  const router = { prefetch: (path) => prefetchedRoutes.push(path), push: (path) => pushedRoutes.push(path) };
   const catalog = [{ id: 17, country_code: "EGY", name: "Egypt", slug: "egypt" }];
   const history = { status: "insufficient_history", message: "More history is required.", data: [], meta: { observed_start_date: "2020-01-01", observed_end_date: "2020-12-31", available_prior_years: 2, required_prior_years: 3 } };
   const mocks = {
@@ -38,7 +48,7 @@ async function mount(hash = "") {
     activityAnomalies: () => history,
     validation: () => ({ status: "ok", data: [], pagination: { limit: 100, offset: 0, total: 0 } }),
   };
-  const api = Object.fromEntries(Object.entries(mocks).map(([name, implementation]) => [name, async (...args) => { calls.push({ name, args }); return implementation(...args); }]));
+  const api = Object.fromEntries(Object.entries(mocks).map(([name, implementation]) => [name, async (...args) => { calls.push({ name, args }); if (apiGate) await (typeof apiGate === "function" ? apiGate(name) : apiGate); return implementation(...args); }]));
   const modules = new Map();
   function load(filename) {
     if (modules.has(filename)) return modules.get(filename).exports;
@@ -46,7 +56,15 @@ async function mount(hash = "") {
     modules.set(filename, module);
     const output = ts.transpileModule(readFileSync(filename, "utf8"), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
     function localRequire(id) {
-      if (id === "next/dynamic") return () => () => h("div", { "data-testid": "fire-map" }, "Map");
+      if (id === "next/navigation") return { useRouter: () => router };
+      if (id === "next/link") return ({ href, children, ...props }) => h("a", { href, ...props }, children);
+      if (id === "./fire-map") return { default: () => null };
+      if (id === "next/dynamic") return () => ({ filters }) => {
+        const { useInfiniteQuery } = require("@tanstack/react-query");
+        const { dashboardQueries } = load(resolve(project, "lib/dashboard-queries.ts"));
+        const result = useInfiniteQuery(dashboardQueries.map(filters));
+        return h("div", { "data-testid": "fire-map" }, `Map: ${result.data?.pages[0]?.data.length ?? 0}`);
+      };
       if (id === "recharts") return new Proxy({}, { get: () => ({ children }) => h("div", null, children) });
       if (!id.startsWith(".") && !id.startsWith("@/")) return require(id);
       const target = id.startsWith("@/") ? resolve(project, id.slice(2)) : resolve(dirname(filename), id);
@@ -59,12 +77,22 @@ async function mount(hash = "") {
     return module.exports;
   }
   const Dashboard = load(resolve(project, "components/dashboard.tsx")).default;
+  const Preloader = load(resolve(project, "components/dashboard-preloader.tsx")).default;
+  const LandingPage = load(resolve(project, "components/landing-page.tsx")).default;
+  const { dashboardCacheOptions, preloadDashboardData } = load(resolve(project, "lib/dashboard-queries.ts"));
   const { QueryClient, QueryClientProvider } = require("@tanstack/react-query");
   const { createRoot } = require("react-dom/client");
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
+  const client = new QueryClient({ defaultOptions: { queries: { ...dashboardCacheOptions, retry: false } } });
   const root = createRoot(dom.window.document.getElementById("app"));
-  await act(async () => root.render(h(QueryClientProvider, { client }, h(Dashboard))));
-  await act(delay);
+  async function showLanding() {
+    await act(async () => root.render(h(QueryClientProvider, { client }, h(StrictMode, null, h(Preloader), h(LandingPage)))));
+    await act(delay);
+  }
+  async function showDashboard() {
+    await act(async () => root.render(h(QueryClientProvider, { client }, h(Dashboard))));
+    await act(delay);
+  }
+  await (landing ? showLanding() : showDashboard());
   const document = dom.window.document;
   const select = (label) => [...document.querySelectorAll("label")].find((node) => node.querySelector("span")?.textContent === label)?.querySelector("select");
   async function change(label, value) {
@@ -78,7 +106,8 @@ async function mount(hash = "") {
     await act(delay);
   }
   return {
-    dom, document, calls, select, change, navigate,
+    dom, document, calls, select, change, navigate, client, prefetchedRoutes, pushedRoutes, showLanding, showDashboard,
+    preload: () => preloadDashboardData(client),
     async close() {
       await act(async () => root.unmount());
       client.clear();
@@ -90,6 +119,150 @@ async function mount(hash = "") {
     },
   };
 }
+
+test("landing warms every default workspace once and cached data survives navigation and elapsed time", async () => {
+  const app = await mount("", { landing: true });
+  try {
+    assert.deepEqual(app.prefetchedRoutes, ["/dashboard"]);
+    assert.equal(app.calls.length, 16, "Strict Mode must not duplicate preload requests");
+    assert.equal(new Set(app.calls.map(({ name }) => name)).size, 15, "Includes all products and separate map/table pages");
+    assert.equal(app.preload(), app.preload(), "Repeated landing visits share one preload promise");
+    for (const { args } of app.calls) {
+      const filters = args[0];
+      if (filters && !(filters instanceof AbortSignal)) {
+        assert.equal(filters.startDate, "");
+        assert.equal(filters.endDate, "");
+        if ("region" in filters) { assert.equal(filters.region, ""); assert.equal(filters.sensor, "ALL"); }
+        if ("regionPk" in filters) assert.equal(filters.regionPk, "");
+      }
+    }
+    // Move successful results beyond both former expiry times without waiting.
+    for (const query of app.client.getQueryCache().getAll()) {
+      app.client.setQueryData(query.queryKey, query.state.data, { updatedAt: Date.now() - 10 * 60_000 });
+      assert.equal(query.gcTime, Infinity);
+    }
+    await app.showDashboard();
+    assert.equal(app.select("REGION").value, "");
+    for (const view of ["activity", "analytics", "data", "harmonization", "validation", "map"]) await app.navigate(view);
+    assert.match(app.document.querySelector('[data-testid="fire-map"]').textContent, /Map: 201/);
+    await app.showLanding();
+    await app.showDashboard();
+    assert.equal(app.calls.length, 16, "Returning to either page must reuse completed results");
+    assert.deepEqual(app.prefetchedRoutes, ["/dashboard"], "Returning must not restart route prefetching");
+
+    await app.navigate("data");
+    await app.change("REGION", "EGY");
+    assert.equal(app.calls.length, 17, "A new selection still loads its own data");
+    assert.equal(app.calls.at(-1).args[0].region, "EGY");
+    await app.change("REGION", "");
+    assert.equal(app.calls.length, 17, "Restoring the default selection reuses its original data");
+  } finally { await app.close(); }
+});
+
+test("opening the dashboard during preload shares its in-flight default request", async () => {
+  let release;
+  const apiGate = new Promise((done) => { release = done; });
+  const app = await mount("", { landing: true, apiGate });
+  try {
+    await app.showDashboard();
+    assert.equal(app.calls.length, 16);
+    await act(async () => { release(); await app.preload(); });
+    await act(delay);
+    assert.match(app.document.querySelector(".metric-value").textContent, /201/);
+    assert.equal(app.calls.length, 16);
+  } finally { release(); await app.close(); }
+});
+
+test("an early launch shows actual progress, then opens the requested dashboard view once", async () => {
+  let release;
+  const pending = new Promise((done) => { release = done; });
+  const app = await mount("", { landing: true, apiGate: (name) => name === "calendar" ? pending : undefined });
+  try {
+    assert.equal(app.document.querySelector("dialog"), null, "Background preload must stay unobtrusive");
+    const link = app.document.querySelector('a[href="/dashboard#map"]');
+    await act(async () => link.click());
+    const dialog = app.document.querySelector("dialog");
+    assert.ok(dialog.open);
+    assert.match(dialog.textContent, /Launching your dashboard/);
+    assert.equal(app.document.body.style.overflow, "hidden");
+    assert.equal(app.document.activeElement, dialog.querySelector("button"));
+    const progress = dialog.querySelector('[role="progressbar"]');
+    assert.equal(progress.getAttribute("aria-valuenow"), "0", "Every launch starts with an empty bar");
+    await waitFor(() => progress.getAttribute("aria-valuenow") === "94");
+    assert.deepEqual(app.pushedRoutes, [], "Navigation must wait for preload completion");
+    await act(async () => { release(); await app.preload(); });
+    await waitFor(() => progress.getAttribute("aria-valuenow") === "100");
+    await waitFor(() => app.pushedRoutes.length === 1);
+    assert.deepEqual(app.pushedRoutes, ["/dashboard#map"]);
+    assert.equal(app.calls.length, 16, "Waiting for launch must not duplicate API calls");
+    await app.showDashboard();
+    assert.equal(app.document.querySelector("dialog"), null);
+    assert.equal(app.document.body.style.overflow, "");
+  } finally { release(); await app.close(); }
+});
+
+test("a fully preloaded dashboard still shows a quick fill before navigating", async () => {
+  const app = await mount("", { landing: true });
+  try {
+    await act(async () => { await app.preload(); });
+    const event = new app.dom.window.MouseEvent("click", { bubbles: true, cancelable: true });
+    await act(async () => app.document.querySelector('a[href="/dashboard"]').dispatchEvent(event));
+    assert.equal(event.defaultPrevented, true);
+    assert.ok(app.document.querySelector("dialog").open);
+    const progress = app.document.querySelector('[role="progressbar"]');
+    assert.equal(progress.getAttribute("aria-valuenow"), "0");
+    assert.deepEqual(app.pushedRoutes, []);
+    await waitFor(() => Number(progress.getAttribute("aria-valuenow")) > 0);
+    assert.ok(Number(progress.getAttribute("aria-valuenow")) < 100, "The bar visibly fills between zero and completion");
+    assert.deepEqual(app.pushedRoutes, []);
+    await waitFor(() => progress.getAttribute("aria-valuenow") === "100");
+    assert.deepEqual(app.pushedRoutes, [], "Navigation waits for the final fill transition");
+    await waitFor(() => app.pushedRoutes.length === 1);
+    assert.deepEqual(app.pushedRoutes, ["/dashboard"]);
+    assert.equal(app.calls.length, 16, "Replaying the bar must reuse preloaded data");
+  } finally { await app.close(); }
+});
+
+test("launch can be cancelled with its button or Escape while preload continues", async () => {
+  let release;
+  const apiGate = new Promise((done) => { release = done; });
+  const app = await mount("", { landing: true, apiGate });
+  try {
+    const link = app.document.querySelector('a[href="/dashboard"]');
+    link.focus();
+    await act(async () => link.click());
+    await act(async () => app.document.querySelector("dialog button").click());
+    assert.equal(app.document.querySelector("dialog"), null);
+    assert.equal(app.document.body.style.overflow, "");
+    assert.equal(app.document.activeElement, link);
+    await act(async () => link.click());
+    await act(async () => app.document.querySelector("dialog").dispatchEvent(new app.dom.window.Event("cancel", { cancelable: true })));
+    assert.equal(app.document.querySelector("dialog"), null);
+    await act(async () => { release(); await app.preload(); });
+    await act(delay);
+    assert.deepEqual(app.pushedRoutes, [], "Cancelled launches must never navigate later");
+    assert.equal(app.calls.length, 16);
+  } finally { release(); await app.close(); }
+});
+
+test("modified clicks keep browser navigation behavior and API failures do not trap the launch", async () => {
+  let release;
+  const pending = new Promise((done) => { release = done; });
+  const app = await mount("", { landing: true, apiGate: async () => { await pending; throw new Error("Backend unavailable"); } });
+  try {
+    const link = app.document.querySelector('a[href="/dashboard"]');
+    for (const modifiers of [{ ctrlKey: true }, { metaKey: true }, { shiftKey: true }, { altKey: true }]) {
+      const event = new app.dom.window.MouseEvent("click", { bubbles: true, cancelable: true, ...modifiers });
+      await act(async () => link.dispatchEvent(event));
+      assert.equal(event.defaultPrevented, false);
+      assert.equal(app.document.querySelector("dialog"), null);
+    }
+    await act(async () => link.click());
+    await act(async () => { release(); await app.preload(); });
+    await waitFor(() => app.pushedRoutes.length === 1);
+    assert.deepEqual(app.pushedRoutes, ["/dashboard"], "Failed requests settle so the workspace can show its retry controls");
+  } finally { release(); await app.close(); }
+});
 
 test("sidebar switches related views and preserves raw dates, sensor, and product region", async () => {
   const app = await mount();

@@ -5,7 +5,7 @@ import { useInfiniteQuery, useQueryClient, type InfiniteData } from "@tanstack/r
 import { CircleMarker, MapContainer, Popup, TileLayer, useMap } from "react-leaflet";
 import { geoJSON, latLngBounds, type LatLngBounds } from "leaflet";
 import { LocateFixed } from "lucide-react";
-import { api } from "@/lib/api/client";
+import { dashboardQueries } from "@/lib/dashboard-queries";
 import type { FireDetection, FireListResult, Filters } from "@/lib/api/types";
 import countries from "@/lib/fire-map-countries.json";
 import "leaflet/dist/leaflet.css";
@@ -14,7 +14,6 @@ type StudyRegion = Omit<(typeof countries.features)[number], "type"> & { type: "
 const studyRegions = countries.features as StudyRegion[];
 const africaBounds = latLngBounds([[-35, -18], [38, 52]]);
 const cartoApiKey = process.env.NEXT_PUBLIC_CARTO_API_KEY?.trim();
-const pageSize = 500;
 const sensorColors = { MODIS: "#cf551b", VIIRS: "#256ab8", Unknown: "#657388" };
 
 function sensorName(sensor: string | null | undefined) {
@@ -62,19 +61,9 @@ export default function FireMap({ filters, dark }: { filters: Filters; dark: boo
     filters.region ? studyRegions.filter(({ properties }) => properties.code === filters.region) : studyRegions
   ), [filters.region]);
   const queryClient = useQueryClient();
-  const queryKey = ["map-detections", filters] as const;
-  const detections = useInfiniteQuery({
-    queryKey,
-    queryFn: ({ pageParam, signal }) => api.fires(filters, pageParam, pageSize, signal),
-    initialPageParam: 1,
-    getNextPageParam: (lastPage, _pages, lastPageNumber) => {
-      const { offset, total } = lastPage.pagination;
-      return lastPage.data.length > 0 && offset + lastPage.data.length < total
-        ? lastPageNumber + 1
-        : undefined;
-    },
-    staleTime: 5 * 60_000,
-  });
+  const mapQuery = dashboardQueries.map(filters);
+  const queryKey = mapQuery.queryKey;
+  const detections = useInfiniteQuery(mapQuery);
   const loadedPages = detections.data?.pages.length ?? 0;
 
   function showFewerHotspots() {
